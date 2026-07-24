@@ -1130,13 +1130,14 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
         </div>
       )}
 
-      {/* Selected Food Servings adjustment modal popup */}
+      {/* Selected Food Servings adjustment modal popup with Smart Portion Selector */}
       {selectedFoodForServing && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6">
-            <h3 className="text-lg font-extrabold text-white mb-1">{selectedFoodForServing.name}</h3>
-            <p className="text-xs text-slate-400 mb-4">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
+            <h3 className="text-lg font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
+            <p className="text-xs text-slate-400 mb-3">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
 
+            {/* Calculated Macros Badge */}
             <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 font-mono text-center">
               <span className="text-2xl font-black text-cyan-400">
                 {Math.round(selectedFoodForServing.calories * multiplier)}{' '}
@@ -1155,48 +1156,84 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
               </div>
             </div>
 
-            {(selectedFoodForServing.id.startsWith('off_') || selectedFoodForServing.id.startsWith('custom_')) ? (
-              <div className="mb-5">
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-                  Quantità (g):
-                </label>
-                <input
-                  type="number"
-                  step="10"
-                  min="1"
-                  max="2000"
-                  value={servingsInput}
-                  onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 100))}
-                  className="w-full text-center py-3 text-lg font-bold font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-            ) : (
-              <div className="mb-5">
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-                  Numero di Porzioni:
-                </label>
-                <input
-                  type="number"
-                  step="0.25"
-                  min="0.25"
-                  max="20"
-                  value={servingsInput}
-                  onChange={(e) => setServingsInput(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                  className="w-full text-center py-3 text-lg font-bold font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-            )}
+            {/* Smart Portion Presets */}
+            {(() => {
+              const lowerName = selectedFoodForServing.name.toLowerCase();
+              let matchedPreset: { unitName: string; defaultGrams: number } | null = null;
+
+              if (lowerName.includes('mela')) matchedPreset = { unitName: '1 Mela (media)', defaultGrams: 150 };
+              else if (lowerName.includes('banana')) matchedPreset = { unitName: '1 Banana (media)', defaultGrams: 120 };
+              else if (lowerName.includes('arancia')) matchedPreset = { unitName: '1 Arancia', defaultGrams: 130 };
+              else if (lowerName.includes('uovo')) matchedPreset = { unitName: '1 Uovo (medio)', defaultGrams: 50 };
+              else if (lowerName.includes('albume')) matchedPreset = { unitName: '1 Albume d\'uovo', defaultGrams: 35 };
+              else if (lowerName.includes('pollo')) matchedPreset = { unitName: '1 Petto di Pollo', defaultGrams: 150 };
+              else if (lowerName.includes('tacchino')) matchedPreset = { unitName: '1 Petto di Tacchino', defaultGrams: 150 };
+              else if (lowerName.includes('bistecca')) matchedPreset = { unitName: '1 Bistecca', defaultGrams: 200 };
+              else if (lowerName.includes('salmone')) matchedPreset = { unitName: '1 Filetto Salmone', defaultGrams: 150 };
+              else if (lowerName.includes('mozzarella')) matchedPreset = { unitName: '1 Mozzarella', defaultGrams: 125 };
+              else if (lowerName.includes('yogurt')) matchedPreset = { unitName: '1 Vasetto Yogurt', defaultGrams: 150 };
+              else if (lowerName.includes('pane')) matchedPreset = { unitName: '1 Rosetta / Fetta', defaultGrams: 60 };
+              else if (lowerName.includes('patat')) matchedPreset = { unitName: '1 Patata', defaultGrams: 150 };
+
+              return (
+                <div className="space-y-3 mb-5">
+                  {matchedPreset && (
+                    <div className="bg-cyan-950/30 border border-cyan-800/40 p-2.5 rounded-2xl text-[11px] text-cyan-300 flex items-center justify-between">
+                      <span className="font-semibold">Unità standard:</span>
+                      <span className="font-bold font-mono">{matchedPreset.unitName} ≈ {matchedPreset.defaultGrams}g</span>
+                    </div>
+                  )}
+
+                  {/* Quantity In Grams Field */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-bold text-slate-300">
+                        Peso / Quantità in Grammi (g)
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">Totale: {Math.round(servingsInput)}g</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="5"
+                      min="1"
+                      max="3000"
+                      value={servingsInput}
+                      onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 100))}
+                      className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  {/* Quick Gram Presets */}
+                  <div className="flex gap-1.5 justify-center">
+                    {[50, 100, 150, 200, 250].map((presetG) => (
+                      <button
+                        key={presetG}
+                        type="button"
+                        onClick={() => setServingsInput(presetG)}
+                        className={`py-1 px-2.5 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                          servingsInput === presetG
+                            ? 'bg-cyan-500 text-slate-950 shadow-md'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {presetG}g
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="flex gap-2">
               <button
                 onClick={() => setSelectedFoodForServing(null)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-350 font-semibold text-sm cursor-pointer"
+                className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
               >
                 Annulla
               </button>
               <button
                 onClick={handleConfirmServingAdd}
-                className="flex-1 py-3 rounded-2xl bg-cyan-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
               >
                 Aggiungi a {selectedMeal}
               </button>

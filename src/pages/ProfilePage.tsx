@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NotificationSettings } from '../components/profile/NotificationSettings';
-import { User, Crown, Smartphone, Download, LogOut, ChevronRight, Bell, AlertTriangle, Check } from 'lucide-react';
+import { User, Crown, Smartphone, Download, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDiaryStore } from '../store/diaryStore';
 import { jsPDF } from 'jspdf';
@@ -9,73 +9,11 @@ export const ProfilePage: React.FC = () => {
   const { user, signOut } = useAuth();
   const { logs, getTotalsForDate, weightLogs, waterIntakeMl, deferredPrompt, setDeferredPrompt } = useDiaryStore();
 
-  const [notificationPermission, setNotificationPermission] = useState<string>('default');
-  const [reminders, setReminders] = useState({
-    breakfastEnabled: false,
-    breakfastTime: '08:30',
-    lunchEnabled: false,
-    lunchTime: '13:00',
-    dinnerEnabled: false,
-    dinnerTime: '20:00',
-    snacksEnabled: false,
-    snacksTime: '16:30',
-  });
-
   // Export states
   const [exportRange, setExportRange] = useState('7'); // '7', '30', 'custom'
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-
-  // Load PWA reminders settings & notification permissions
-  useEffect(() => {
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-    }
-    const saved = localStorage.getItem('nutriumfit-reminder-settings');
-    if (saved) {
-      try {
-        setReminders(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
-
-  const handleRequestPermission = async () => {
-    if (!('Notification' in window)) {
-      alert('Questo browser non supporta le notifiche push.');
-      return;
-    }
-    const res = await Notification.requestPermission();
-    setNotificationPermission(res);
-    if (res === 'granted') {
-      alert('Notifiche abilitate con successo!');
-    }
-  };
-
-  const handleToggleReminder = (key: keyof typeof reminders) => {
-    const updated = { ...reminders, [key]: !reminders[key] };
-    setReminders(updated);
-    localStorage.setItem('nutriumfit-reminder-settings', JSON.stringify(updated));
-  };
-
-  const handleTimeChange = (key: keyof typeof reminders, value: string) => {
-    const updated = { ...reminders, [key]: value };
-    setReminders(updated);
-    localStorage.setItem('nutriumfit-reminder-settings', JSON.stringify(updated));
-  };
-
-  const handleSendTestNotification = () => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      new Notification('NutriumFit Reminders', {
-        body: 'Notifica configurata con successo! Ricordati di registrare i pasti oggi.',
-      });
-    } else {
-      alert('Consenti prima le notifiche tramite il pulsante apposito.');
-    }
-  };
 
   const handleSignOut = async () => {
     if (window.confirm('Sei sicuro di voler uscire?')) {
@@ -439,128 +377,6 @@ export const ProfilePage: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Notifications Settings Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 mb-5 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-          <Bell className="w-4 h-4 text-cyan-400" /> Promemoria Notifiche PWA
-        </h3>
-
-        {notificationPermission !== 'granted' ? (
-          <div className="space-y-3">
-            <div className="p-3 rounded-2xl bg-amber-955/20 border border-amber-800/40 text-amber-300 text-xs flex gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-              <div>
-                Le notifiche sono attualmente <strong>disattivate</strong>.
-                Consenti i permessi per abilitare i promemoria diari.
-              </div>
-            </div>
-            <button
-              onClick={handleRequestPermission}
-              className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-slate-950 text-xs font-bold transition-all cursor-pointer"
-            >
-              Consenti Notifiche
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3.5">
-            <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-xs flex gap-2">
-              <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-              <div>Le notifiche locali sono abilitate sul dispositivo.</div>
-            </div>
-
-            <div className="space-y-2.5">
-              {/* Breakfast */}
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={reminders.breakfastEnabled}
-                    onChange={() => handleToggleReminder('breakfastEnabled')}
-                    className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-slate-200">Colazione</span>
-                </div>
-                <input
-                  type="time"
-                  disabled={!reminders.breakfastEnabled}
-                  value={reminders.breakfastTime}
-                  onChange={(e) => handleTimeChange('breakfastTime', e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-cyan-400 font-mono disabled:opacity-40"
-                />
-              </div>
-
-              {/* Lunch */}
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={reminders.lunchEnabled}
-                    onChange={() => handleToggleReminder('lunchEnabled')}
-                    className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-slate-200">Pranzo</span>
-                </div>
-                <input
-                  type="time"
-                  disabled={!reminders.lunchEnabled}
-                  value={reminders.lunchTime}
-                  onChange={(e) => handleTimeChange('lunchTime', e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-cyan-400 font-mono disabled:opacity-40"
-                />
-              </div>
-
-              {/* Dinner */}
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={reminders.dinnerEnabled}
-                    onChange={() => handleToggleReminder('dinnerEnabled')}
-                    className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-slate-200">Cena</span>
-                </div>
-                <input
-                  type="time"
-                  disabled={!reminders.dinnerEnabled}
-                  value={reminders.dinnerTime}
-                  onChange={(e) => handleTimeChange('dinnerTime', e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-cyan-400 font-mono disabled:opacity-40"
-                />
-              </div>
-
-              {/* Snacks */}
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={reminders.snacksEnabled}
-                    onChange={() => handleToggleReminder('snacksEnabled')}
-                    className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-slate-200">Spuntini</span>
-                </div>
-                <input
-                  type="time"
-                  disabled={!reminders.snacksEnabled}
-                  value={reminders.snacksTime}
-                  onChange={(e) => handleTimeChange('snacksTime', e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-cyan-400 font-mono disabled:opacity-40"
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSendTestNotification}
-              className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-350 text-xs font-bold rounded-xl border border-slate-750 cursor-pointer"
-            >
-              Invia Notifica di Test
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Settings Options List */}
