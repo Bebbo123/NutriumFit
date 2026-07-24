@@ -22,7 +22,15 @@ export const GoalsPage: React.FC = () => {
 
   // Form states
   const [calcMode, setCalcMode] = useState<'auto' | 'manual'>('manual');
+  const [macroInputMode, setMacroInputMode] = useState<'grams' | 'percentages'>(goals.macroInputMode || 'grams');
   const [calories, setCalories] = useState(goals.calories);
+  
+  // Grams state
+  const [carbsG, setCarbsG] = useState(goals.carbs);
+  const [proteinG, setProteinG] = useState(goals.protein);
+  const [fatG, setFatG] = useState(goals.fat);
+
+  // Percentages state
   const [carbPct, setCarbPct] = useState(45);
   const [fatPct, setFatPct] = useState(25);
   const [protPct, setProtPct] = useState(30);
@@ -52,6 +60,11 @@ export const GoalsPage: React.FC = () => {
   useEffect(() => {
     if (isEditing) {
       setCalories(goals.calories);
+      setMacroInputMode(goals.macroInputMode || 'grams');
+      setCarbsG(goals.carbs);
+      setProteinG(goals.protein);
+      setFatG(goals.fat);
+
       setAge(goals.age || 30);
       setGender(goals.gender === 'female' ? 'female' : 'male');
       setHeight(goals.height || 175);
@@ -63,9 +76,9 @@ export const GoalsPage: React.FC = () => {
       setStepsGoal(goals.steps || 10000);
 
       // Estimate percentages from current grams
-      const totalKcal = goals.calories;
-      const cPct = Math.round(((goals.carbs * 4) / totalKcal) * 10) * 10; // round to nearest 5 or 10
-      const fPct = Math.round(((goals.fat * 9) / totalKcal) * 10) * 10;
+      const totalKcal = goals.calories || 2200;
+      const cPct = Math.round(((goals.carbs * 4) / totalKcal) * 100);
+      const fPct = Math.round(((goals.fat * 9) / totalKcal) * 100);
       const pPct = 100 - cPct - fPct;
       setCarbPct(isNaN(cPct) ? 45 : cPct);
       setFatPct(isNaN(fPct) ? 25 : fPct);
@@ -150,28 +163,46 @@ export const GoalsPage: React.FC = () => {
     return Math.max(safetyMin, Math.round(targetCalories));
   };
 
-  const calculatedCalories = calcMode === 'auto' ? runAutoCalculator() : calories;
+  // Derived calculations based on macroInputMode
+  const computedCaloriesFromGrams = (carbsG * 4) + (proteinG * 4) + (fatG * 9);
+
+  const calculatedCalories = macroInputMode === 'grams'
+    ? computedCaloriesFromGrams
+    : (calcMode === 'auto' ? runAutoCalculator() : calories);
+
   const totalPercentage = carbPct + fatPct + protPct;
 
-  // Real-time grams conversion
-  const calculatedCarbsG = Math.round((calculatedCalories * (carbPct / 100)) / 4);
-  const calculatedProteinG = Math.round((calculatedCalories * (protPct / 100)) / 4);
-  const calculatedFatG = Math.round((calculatedCalories * (fatPct / 100)) / 9);
+  // Real-time bidirectional conversions
+  // From Percentages -> Grams
+  const calculatedCarbsGFromPct = Math.round((calculatedCalories * (carbPct / 100)) / 4);
+  const calculatedProteinGFromPct = Math.round((calculatedCalories * (protPct / 100)) / 4);
+  const calculatedFatGFromPct = Math.round((calculatedCalories * (fatPct / 100)) / 9);
+
+  // From Grams -> Percentages
+  const calculatedCarbPctFromG = computedCaloriesFromGrams > 0 ? Math.round(((carbsG * 4) / computedCaloriesFromGrams) * 100) : 0;
+  const calculatedFatPctFromG = computedCaloriesFromGrams > 0 ? Math.round(((fatG * 9) / computedCaloriesFromGrams) * 100) : 0;
+  const calculatedProtPctFromG = computedCaloriesFromGrams > 0 ? Math.round(((proteinG * 4) / computedCaloriesFromGrams) * 100) : 0;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    if (totalPercentage !== 100) {
+    if (macroInputMode === 'percentages' && totalPercentage !== 100) {
       alert('La somma delle percentuali dei macronutrienti deve essere esattamente 100%.');
       return;
     }
 
+    const finalCarbs = macroInputMode === 'grams' ? carbsG : calculatedCarbsGFromPct;
+    const finalProtein = macroInputMode === 'grams' ? proteinG : calculatedProteinGFromPct;
+    const finalFat = macroInputMode === 'grams' ? fatG : calculatedFatGFromPct;
+    const finalCalories = macroInputMode === 'grams' ? computedCaloriesFromGrams : calculatedCalories;
+
     const newGoals = {
-      calories: calculatedCalories,
-      carbs: calculatedCarbsG,
-      fat: calculatedFatG,
-      protein: calculatedProteinG,
+      calories: finalCalories,
+      carbs: finalCarbs,
+      fat: finalFat,
+      protein: finalProtein,
+      macroInputMode,
       waterMl: waterGoalMl,
       steps: stepsGoal,
       currentWeight: calcMode === 'auto' ? currentWeight : undefined,
@@ -514,73 +545,163 @@ export const GoalsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Macro Distribution Percentages */}
+          {/* Macro Distribution Mode Switcher & Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-              <span className="text-xs font-bold text-slate-200">Percentuali Macronutrienti</span>
-              <span
-                className={`text-xs font-bold font-mono px-2 py-0.5 rounded-full border ${
-                  totalPercentage === 100
-                    ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/50'
-                    : 'text-red-400 bg-red-950/60 border-red-800/50'
-                }`}
-              >
-                Totale: {totalPercentage}%
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {/* Carbs % */}
-              <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span className="font-semibold text-blue-400">Carboidrati</span>
-                  <span className="font-mono font-bold">{calculatedCarbsG}g ({carbPct}%)</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="80"
-                  step="5"
-                  value={carbPct}
-                  onChange={(e) => setCarbPct(parseInt(e.target.value))}
-                  className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-              </div>
-
-              {/* Fat % */}
-              <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span className="font-semibold text-red-400">Grassi</span>
-                  <span className="font-mono font-bold">{calculatedFatG}g ({fatPct}%)</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="60"
-                  step="5"
-                  value={fatPct}
-                  onChange={(e) => setFatPct(parseInt(e.target.value))}
-                  className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-red-500"
-                />
-              </div>
-
-              {/* Protein % */}
-              <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span className="font-semibold text-emerald-400">Proteine</span>
-                  <span className="font-mono font-bold">{calculatedProteinG}g ({protPct}%)</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="60"
-                  step="5"
-                  value={protPct}
-                  onChange={(e) => setProtPct(parseInt(e.target.value))}
-                  className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+              <span className="text-xs font-bold text-slate-200">Modalità Inserimento Macro</span>
+              <div className="flex bg-slate-950 border border-slate-800 p-0.5 rounded-xl text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setMacroInputMode('grams')}
+                  className={`py-1 px-3 rounded-lg transition-all cursor-pointer ${
+                    macroInputMode === 'grams'
+                      ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Grammi (g)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMacroInputMode('percentages')}
+                  className={`py-1 px-3 rounded-lg transition-all cursor-pointer ${
+                    macroInputMode === 'percentages'
+                      ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Percentuali (%)
+                </button>
               </div>
             </div>
+
+            {macroInputMode === 'grams' ? (
+              /* --- MODE A: EXACT GRAMS --- */
+              <div className="space-y-3.5 pt-1">
+                {/* Carbs (g) */}
+                <div>
+                  <div className="flex justify-between text-[11px] font-semibold text-slate-400 mb-1">
+                    <span className="text-blue-400 font-bold">Carboidrati (g)</span>
+                    <span className="font-mono text-slate-300">~{calculatedCarbPctFromG}% del totale</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={carbsG}
+                    onChange={(e) => setCarbsG(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-sm font-bold text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Protein (g) */}
+                <div>
+                  <div className="flex justify-between text-[11px] font-semibold text-slate-400 mb-1">
+                    <span className="text-emerald-400 font-bold">Proteine (g)</span>
+                    <span className="font-mono text-slate-300">~{calculatedProtPctFromG}% del totale</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={proteinG}
+                    onChange={(e) => setProteinG(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-sm font-bold text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Fat (g) */}
+                <div>
+                  <div className="flex justify-between text-[11px] font-semibold text-slate-400 mb-1">
+                    <span className="text-red-400 font-bold">Grassi (g)</span>
+                    <span className="font-mono text-slate-300">~{calculatedFatPctFromG}% del totale</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={fatG}
+                    onChange={(e) => setFatG(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-sm font-bold text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Grams Computed Summary Badge */}
+                <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-2xl text-[11px] text-slate-300 flex items-center justify-between">
+                  <span className="font-semibold text-slate-400">Calorie Calcolate dai Grammi:</span>
+                  <span className="font-mono font-black text-cyan-400 text-sm">{computedCaloriesFromGrams} kcal</span>
+                </div>
+              </div>
+            ) : (
+              /* --- MODE B: PERCENTAGES --- */
+              <div>
+                <div className="flex items-center justify-between mb-3 text-xs font-mono">
+                  <span className="text-slate-400">Distribuzione %</span>
+                  <span
+                    className={`font-bold px-2 py-0.5 rounded-full border ${
+                      totalPercentage === 100
+                        ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/50'
+                        : 'text-red-400 bg-red-950/60 border-red-800/50'
+                    }`}
+                  >
+                    Totale: {totalPercentage}%
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Carbs % */}
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span className="font-semibold text-blue-400">Carboidrati ({carbPct}%)</span>
+                      <span className="font-mono font-bold text-slate-200">{calculatedCarbsGFromPct}g</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="80"
+                      step="5"
+                      value={carbPct}
+                      onChange={(e) => setCarbPct(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+
+                  {/* Fat % */}
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span className="font-semibold text-red-400">Grassi ({fatPct}%)</span>
+                      <span className="font-mono font-bold text-slate-200">{calculatedFatGFromPct}g</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="60"
+                      step="5"
+                      value={fatPct}
+                      onChange={(e) => setFatPct(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-red-500"
+                    />
+                  </div>
+
+                  {/* Protein % */}
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span className="font-semibold text-emerald-400">Proteine ({protPct}%)</span>
+                      <span className="font-mono font-bold text-slate-200">{calculatedProteinGFromPct}g</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="60"
+                      step="5"
+                      value={protPct}
+                      onChange={(e) => setProtPct(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Water & Steps Target Editors */}

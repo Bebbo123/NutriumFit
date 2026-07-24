@@ -42,6 +42,7 @@ export interface DailyGoals {
   protein: number; // goal in grams
   waterMl: number; // goal in ml
   steps: number;   // goal step count
+  macroInputMode?: 'grams' | 'percentages';
   currentWeight?: number;
   targetWeight?: number;
   weeklyGoal?: string;

@@ -61,6 +61,7 @@ export const diaryService = {
         protein: profile.protein_goal || 150,
         waterMl: profile.water_goal_ml || 2000,
         steps: profile.steps_goal || 10000,
+        macroInputMode: (profile as any).macro_input_mode || 'grams',
         currentWeight: profile.current_weight,
         targetWeight: profile.target_weight,
         weeklyGoal: profile.weekly_goal,
@@ -88,6 +89,7 @@ export const diaryService = {
       if (goals.protein !== undefined) updates.protein_goal = goals.protein;
       if (goals.waterMl !== undefined) updates.water_goal_ml = goals.waterMl;
       if (goals.steps !== undefined) updates.steps_goal = goals.steps;
+      if (goals.macroInputMode !== undefined) updates.macro_input_mode = goals.macroInputMode;
       if (goals.currentWeight !== undefined) updates.current_weight = goals.currentWeight;
       if (goals.targetWeight !== undefined) updates.target_weight = goals.targetWeight;
       if (goals.weeklyGoal !== undefined) updates.weekly_goal = goals.weeklyGoal;
