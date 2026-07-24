@@ -93,7 +93,7 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 max-w-md mx-auto relative font-sans">
+    <div className="pb-24 pt-safe px-4 max-w-md mx-auto relative font-sans">
       {isOffline && (
         <div className="bg-amber-500 text-slate-950 px-4 py-2 text-center text-xs font-bold flex items-center justify-center gap-1.5 rounded-2xl mb-4 border border-amber-400/30 shadow-md">
           <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping" />

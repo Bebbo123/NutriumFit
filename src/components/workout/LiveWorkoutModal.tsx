@@ -65,7 +65,7 @@ export const LiveWorkoutModal: React.FC = () => {
     <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col overflow-hidden animate-in slide-in-from-bottom-full duration-300">
       
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 shrink-0">
+      <div className="flex items-center justify-between p-4 pt-safe bg-slate-900 border-b border-slate-800 shrink-0">
         <button 
           onClick={cancelWorkout}
           className="text-slate-400 hover:text-white p-2 -ml-2"

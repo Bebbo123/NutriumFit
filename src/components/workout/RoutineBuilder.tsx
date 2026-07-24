@@ -65,7 +65,7 @@ export const RoutineBuilder: React.FC<RoutineBuilderProps> = ({ onClose, onSave 
 
   return (
     <div className="fixed inset-0 z-[90] bg-slate-950 flex flex-col animate-in slide-in-from-right duration-200">
-      <div className="p-4 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
+      <div className="p-4 pt-safe border-b border-slate-800 bg-slate-900 flex justify-between items-center">
         <button onClick={onClose} className="p-2 -ml-2 text-slate-400">
           <X className="w-6 h-6" />
         </button>

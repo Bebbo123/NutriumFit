@@ -331,7 +331,7 @@ export const ProfilePage: React.FC = () => {
   const userDisplayEmail = user?.email || 'utente@nutriumfit.app';
 
   return (
-    <div className="pb-24 pt-4 px-4 max-w-md mx-auto font-sans">
+    <div className="pb-24 pt-safe px-4 max-w-md mx-auto font-sans">
       {/* Profile Header */}
       <div className="bg-gradient-to-tr from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 mb-5 text-center shadow-lg relative overflow-hidden">
         <div className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md">

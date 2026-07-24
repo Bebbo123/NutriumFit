@@ -205,7 +205,7 @@ export const GoalsPage: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 pt-4 px-4 max-w-md mx-auto relative">
+    <div className="pb-24 pt-safe px-4 max-w-md mx-auto relative">
       {/* Tab Selector */}
       <div className="flex bg-slate-900/90 border border-slate-800 rounded-2xl p-1 mb-5 shadow-sm">
         <button

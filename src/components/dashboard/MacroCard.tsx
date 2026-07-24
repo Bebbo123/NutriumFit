@@ -39,34 +39,37 @@ export const MacroCard: React.FC<MacroCardProps> = ({
   const remainingGrams = Math.max(0, Math.round(goalGrams - currentGrams));
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3.5 shadow-sm hover:border-slate-700/80 transition-all">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <span className={`w-2.5 h-2.5 rounded-full ${config.barColor} inline-block`} />
-          <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+    <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-3 shadow-sm hover:border-slate-700/80 transition-all flex flex-col justify-between">
+      {/* Macro Header */}
+      <div>
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className={`w-2 h-2 rounded-full ${config.barColor} shrink-0`} />
+          <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider truncate">
             {label}
           </span>
         </div>
-        <span className="text-[11px] font-medium text-slate-400 font-mono">
+        <div className="text-[10px] font-medium text-slate-400 font-mono mb-2">
           {remainingGrams}g rimanenti
-        </span>
+        </div>
       </div>
 
+      {/* Progress Bar */}
       <div className="mb-2">
         <ProgressBar
           value={currentGrams}
           max={goalGrams}
           colorClass={config.barColor}
-          heightClass="h-2"
+          heightClass="h-1.5"
         />
       </div>
 
-      <div className="flex items-baseline justify-between text-xs">
+      {/* Bottom Amounts */}
+      <div className="flex items-center justify-between text-[11px] leading-none">
         <span className="font-bold text-slate-100 font-mono">
           {Math.round(currentGrams)}
-          <span className="text-slate-400 font-normal"> / {goalGrams}g</span>
+          <span className="text-slate-400 font-normal text-[10px]">/{goalGrams}g</span>
         </span>
-        <span className="text-[11px] font-semibold text-slate-400 font-mono">
+        <span className="text-[10px] font-semibold text-slate-400 font-mono">
           {Math.round((currentGrams / Math.max(1, goalGrams)) * 100)}%
         </span>
       </div>

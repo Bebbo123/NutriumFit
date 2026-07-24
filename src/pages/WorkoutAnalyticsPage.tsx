@@ -56,7 +56,7 @@ export const WorkoutAnalyticsPage: React.FC<WorkoutAnalyticsPageProps> = ({ onBa
   return (
     <div className="pb-24 min-h-screen bg-slate-950 text-slate-100">
       {/* Top Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-4 pt-12 pb-4 sticky top-0 z-30 flex items-center gap-3">
+      <div className="bg-slate-900 border-b border-slate-800 px-4 pt-safe pb-4 sticky top-0 z-30 flex items-center gap-3">
         <button 
           onClick={onBack}
           className="p-2 bg-slate-800 rounded-xl text-slate-300 hover:text-white transition-colors"

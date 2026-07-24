@@ -62,7 +62,7 @@ export const WorkoutPage: React.FC = () => {
   return (
     <div className="pb-24">
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-4 pt-12 pb-4 sticky top-0 z-30">
+      <div className="bg-slate-900 border-b border-slate-800 px-4 pt-safe pb-4 sticky top-0 z-30">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Dumbbell className="w-6 h-6 text-cyan-400" />

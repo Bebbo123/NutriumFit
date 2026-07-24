@@ -19,10 +19,10 @@
 
 /* Macro Design Tokens & Safe Area Helpers */
 .pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
 }
 .pt-safe {
-  padding-top: max(env(safe-area-inset-top), 1rem);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
 }
 
 /* Glassmorphism utility */
