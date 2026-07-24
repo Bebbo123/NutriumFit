@@ -20,7 +20,7 @@ import type { FoodTab } from '../components/food/TabBar';
 import type { MealType, FoodItem, Recipe, RecipeIngredient, SavedMeal } from '../types/diary';
 import { useAuth } from '../context/AuthContext';
 import { useDebounce } from '../hooks/useDebounce';
-import { searchOpenFoodFacts, fetchFoodByBarcode } from '../services/foodApiService';
+import { searchAllFoods, fetchFoodByBarcode } from '../services/foodApiService';
 import { diaryService } from '../services/diaryService';
 import { Html5Qrcode } from 'html5-qrcode';
 
@@ -155,7 +155,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
       try {
         const [customResults, apiResults] = await Promise.all([
           user ? diaryService.searchCustomFoods(user.id, debouncedSearchQuery) : Promise.resolve([]),
-          searchOpenFoodFacts(debouncedSearchQuery)
+          searchAllFoods(debouncedSearchQuery)
         ]);
 
         if (active) {
@@ -192,7 +192,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
       try {
         const [customResults, apiResults] = await Promise.all([
           user ? diaryService.searchCustomFoods(user.id, debouncedRbQuery) : Promise.resolve([]),
-          searchOpenFoodFacts(debouncedRbQuery)
+          searchAllFoods(debouncedRbQuery)
         ]);
 
         if (active) {
