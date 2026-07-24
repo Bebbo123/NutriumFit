@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabaseClient';
-import type { Exercise, Routine, RoutineExercise, PreviousSetPerformance, ExercisePR, ExerciseHistoryPoint } from '../types/workout';
+import type { Exercise, Routine, RoutineExercise, PreviousSetPerformance, ExercisePR, ExerciseHistoryPoint, LastWeekMax, RoutineLastPerformed, WorkoutLogWithSets } from '../types/workout';
 
 export const workoutService = {
   /**
@@ -223,5 +223,138 @@ export const workoutService = {
       return [];
     }
     return (data || []) as ExerciseHistoryPoint[];
+  },
+
+  /**
+   * Updates an existing routine's title and routine_exercises.
+   */
+  async updateRoutine(
+    routineId: string, 
+    title: string, 
+    exercises: { exercise_id: string; target_sets: number; target_reps: string }[]
+  ): Promise<boolean> {
+    if (!navigator.onLine) return false;
+    try {
+      // 1. Update Title
+      const { error: titleError } = await supabase
+        .from('routines')
+        .update({ title })
+        .eq('id', routineId);
+      if (titleError) throw titleError;
+
+      // 2. Delete old routine exercises
+      const { error: deleteError } = await supabase
+        .from('routine_exercises')
+        .delete()
+        .eq('routine_id', routineId);
+      if (deleteError) throw deleteError;
+
+      // 3. Insert new routine exercises
+      const newRoutineExercises = exercises.map((ex, index) => ({
+        routine_id: routineId,
+        exercise_id: ex.exercise_id,
+        order_index: index,
+        target_sets: ex.target_sets,
+        target_reps: ex.target_reps
+      }));
+
+      const { error: insertError } = await supabase
+        .from('routine_exercises')
+        .insert(newRoutineExercises);
+      if (insertError) throw insertError;
+
+      return true;
+    } catch (err) {
+      console.error('Error updating routine:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Deletes a routine and its associated exercises.
+   */
+  async deleteRoutine(routineId: string): Promise<boolean> {
+    if (!navigator.onLine) return false;
+    const { error } = await supabase
+      .from('routines')
+      .delete()
+      .eq('id', routineId);
+
+    if (error) {
+      console.error('Error deleting routine:', error);
+      return false;
+    }
+    return true;
+  },
+
+  /**
+   * Deletes a completed workout log and its associated sets.
+   */
+  async deleteWorkoutLog(logId: string): Promise<boolean> {
+    if (!navigator.onLine) return false;
+    const { error } = await supabase
+      .from('workout_logs')
+      .delete()
+      .eq('id', logId);
+
+    if (error) {
+      console.error('Error deleting workout log:', error);
+      return false;
+    }
+    return true;
+  },
+
+  /**
+   * Fetches highest weight lifted in the previous calendar week (7 to 14 days ago).
+   */
+  async fetchLastWeekExerciseMax(userId: string, exerciseId: string): Promise<LastWeekMax | null> {
+    if (!navigator.onLine) return null;
+    const { data, error } = await supabase.rpc('get_last_week_exercise_max', {
+      p_user_id: userId,
+      p_exercise_id: exerciseId
+    });
+
+    if (error || !data || data.length === 0) return null;
+    return data[0] as LastWeekMax;
+  },
+
+  /**
+   * Fetches last performed timestamp for user routines.
+   */
+  async fetchRoutineLastPerformed(userId: string): Promise<RoutineLastPerformed[]> {
+    if (!navigator.onLine) return [];
+    const { data, error } = await supabase.rpc('get_routine_last_performed_dates', {
+      p_user_id: userId
+    });
+
+    if (error || !data) return [];
+    return data as RoutineLastPerformed[];
+  },
+
+  /**
+   * Fetches completed workout logs with sets for past X months for history view & PDF export.
+   */
+  async fetchWorkoutHistoryLogs(userId: string, months: number = 6): Promise<WorkoutLogWithSets[]> {
+    if (!navigator.onLine) return [];
+
+    const { data: logsData, error: logsError } = await supabase
+      .from('workout_logs')
+      .select(`
+        *,
+        sets:workout_sets (
+          *,
+          exercise:exercises (name)
+        )
+      `)
+      .eq('user_id', userId)
+      .gte('completed_at', new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('completed_at', { ascending: false });
+
+    if (logsError || !logsData) {
+      console.error('Error fetching workout history logs:', logsError);
+      return [];
+    }
+
+    return logsData as WorkoutLogWithSets[];
   }
 };

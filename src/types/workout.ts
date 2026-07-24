@@ -55,6 +55,8 @@ export interface WorkoutSet {
   is_temporary?: boolean; 
   prev_weight?: number | null;
   prev_reps?: number | null;
+  last_week_weight?: number | null;
+  last_week_reps?: number | null;
   is_pr?: boolean;
   pr_type?: 'weight' | '1rm' | 'both';
 }
@@ -64,6 +66,17 @@ export interface PreviousSetPerformance {
   weight: number;
   reps: number;
   completed_at: string;
+}
+
+export interface LastWeekMax {
+  weight: number;
+  reps: number;
+  completed_at: string;
+}
+
+export interface RoutineLastPerformed {
+  routine_title: string;
+  last_completed_at: string;
 }
 
 export interface ExercisePR {

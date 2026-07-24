@@ -17,7 +17,8 @@ export const LiveWorkoutModal: React.FC = () => {
     removeSet,
     updateSet,
     completeSet,
-    copyPreviousPerformance
+    copyPreviousPerformance,
+    copyLastWeekPerformance
   } = useWorkoutStore();
 
   const [elapsed, setElapsed] = useState(0);
@@ -108,16 +109,32 @@ export const LiveWorkoutModal: React.FC = () => {
                         <Trophy className="w-3 h-3 text-amber-400" /> Record: {ex.allTimePR.max_weight}kg | 1RM: {ex.allTimePR.max_1rm}kg
                       </span>
                     )}
+                    {ex.lastWeekMax && (
+                      <span className="text-[10px] text-cyan-300 font-mono block mt-0.5">
+                        Max sett. prec.: <strong className="text-white">{ex.lastWeekMax.weight} kg</strong> ({ex.lastWeekMax.reps} reps)
+                      </span>
+                    )}
                   </div>
-                  {ex.previousSets && ex.previousSets.length > 0 && (
-                    <button 
-                      onClick={() => copyPreviousPerformance(ex.exercise.id)}
-                      className="text-xs font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors"
-                      title="Copia dati dalla volta precedente"
-                    >
-                      <Copy className="w-3.5 h-3.5" /> Copia Prec.
-                    </button>
-                  )}
+                  <div className="flex flex-col gap-1 items-end">
+                    {ex.previousSets && ex.previousSets.length > 0 && (
+                      <button 
+                        onClick={() => copyPreviousPerformance(ex.exercise.id)}
+                        className="text-xs font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors"
+                        title="Copia dati dalla volta precedente"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Copia Prec.
+                      </button>
+                    )}
+                    {ex.lastWeekMax && (
+                      <button 
+                        onClick={() => copyLastWeekPerformance(ex.exercise.id)}
+                        className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors"
+                        title="Copia il peso massimo della settimana scorsa"
+                      >
+                        Copia Max Sett.
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="p-2 space-y-1 bg-slate-950/50">

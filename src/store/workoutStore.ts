@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { workoutService } from '../services/workoutService';
-import type { Exercise, Routine, RoutineExercise, WorkoutSet, PreviousSetPerformance, ExercisePR } from '../types/workout';
+import type { Exercise, Routine, RoutineExercise, WorkoutSet, PreviousSetPerformance, ExercisePR, LastWeekMax } from '../types/workout';
 import { v4 as uuidv4 } from 'uuid'; // Standard practice for local IDs before sync
 
 export interface ActiveWorkout {
@@ -13,6 +13,7 @@ export interface ActiveWorkout {
     sets: WorkoutSet[];
     previousSets?: PreviousSetPerformance[];
     allTimePR?: ExercisePR;
+    lastWeekMax?: LastWeekMax | null;
   }[];
 }
 
@@ -39,6 +40,7 @@ interface WorkoutStore {
   updateSet: (exerciseId: string, setId: string, updates: Partial<WorkoutSet>) => void;
   completeSet: (exerciseId: string, setId: string, isCompleted: boolean) => void;
   copyPreviousPerformance: (exerciseId: string) => void;
+  copyLastWeekPerformance: (exerciseId: string) => void;
   loadExerciseHistoryData: (userId: string, exerciseId: string) => Promise<void>;
   
   // Timer
@@ -141,9 +143,10 @@ export const useWorkoutStore = create<WorkoutStore>()(
       },
 
       loadExerciseHistoryData: async (userId, exerciseId) => {
-        const [prevSets, prData] = await Promise.all([
+        const [prevSets, prData, lastWeekMax] = await Promise.all([
           workoutService.fetchPreviousPerformance(userId, exerciseId),
-          workoutService.fetchExercisePR(userId, exerciseId)
+          workoutService.fetchExercisePR(userId, exerciseId),
+          workoutService.fetchLastWeekExerciseMax(userId, exerciseId)
         ]);
 
         set((state) => {
@@ -158,7 +161,9 @@ export const useWorkoutStore = create<WorkoutStore>()(
                 return {
                   ...s,
                   prev_weight: prev ? prev.weight : s.prev_weight || null,
-                  prev_reps: prev ? prev.reps : s.prev_reps || null
+                  prev_reps: prev ? prev.reps : s.prev_reps || null,
+                  last_week_weight: lastWeekMax ? lastWeekMax.weight : s.last_week_weight || null,
+                  last_week_reps: lastWeekMax ? lastWeekMax.reps : s.last_week_reps || null
                 };
               });
 
@@ -166,6 +171,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
                 ...ex,
                 previousSets: prevSets,
                 allTimePR: prData,
+                lastWeekMax: lastWeekMax,
                 sets: updatedSets
               };
             }
@@ -188,6 +194,31 @@ export const useWorkoutStore = create<WorkoutStore>()(
                     ...s,
                     weight: s.prev_weight !== undefined ? s.prev_weight : s.weight,
                     reps: s.prev_reps !== undefined ? s.prev_reps : s.reps
+                  };
+                }
+                return s;
+              });
+              return { ...ex, sets: updatedSets };
+            }
+            return ex;
+          });
+
+          return { activeWorkout: { ...state.activeWorkout, exercises: updatedExercises } };
+        });
+      },
+
+      copyLastWeekPerformance: (exerciseId) => {
+        set((state) => {
+          if (!state.activeWorkout) return state;
+
+          const updatedExercises = state.activeWorkout.exercises.map(ex => {
+            if (ex.exercise.id === exerciseId && ex.lastWeekMax) {
+              const updatedSets = ex.sets.map(s => {
+                if (!s.is_completed) {
+                  return {
+                    ...s,
+                    weight: ex.lastWeekMax!.weight,
+                    reps: ex.lastWeekMax!.reps
                   };
                 }
                 return s;

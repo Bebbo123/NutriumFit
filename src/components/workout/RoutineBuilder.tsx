@@ -3,18 +3,25 @@ import { X, Plus, GripVertical } from 'lucide-react';
 import { useWorkoutStore } from '../../store/workoutStore';
 import { supabase } from '../../utils/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import type { Exercise } from '../../types/workout';
+import { workoutService } from '../../services/workoutService';
+import type { Exercise, Routine } from '../../types/workout';
 
 interface RoutineBuilderProps {
   onClose: () => void;
   onSave: () => void;
+  routineToEdit?: {
+    routine: Routine;
+    exercises: { exercise: Exercise; sets: number; reps: string }[];
+  } | null;
 }
 
-export const RoutineBuilder: React.FC<RoutineBuilderProps> = ({ onClose, onSave }) => {
+export const RoutineBuilder: React.FC<RoutineBuilderProps> = ({ onClose, onSave, routineToEdit }) => {
   const { user } = useAuth();
   const { exercises } = useWorkoutStore();
-  const [title, setTitle] = useState('');
-  const [selectedExercises, setSelectedExercises] = useState<{ exercise: Exercise; sets: number; reps: string }[]>([]);
+  const [title, setTitle] = useState(routineToEdit?.routine.title || '');
+  const [selectedExercises, setSelectedExercises] = useState<{ exercise: Exercise; sets: number; reps: string }[]>(
+    routineToEdit?.exercises || []
+  );
   const [showPicker, setShowPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -23,29 +30,39 @@ export const RoutineBuilder: React.FC<RoutineBuilderProps> = ({ onClose, onSave 
     setIsSaving(true);
     
     try {
-      // 1. Insert Routine
-      const { data: routineData, error: routineError } = await supabase
-        .from('routines')
-        .insert({ user_id: user.id, title })
-        .select()
-        .single();
-        
-      if (routineError) throw routineError;
+      if (routineToEdit) {
+        // Update existing routine
+        const formattedExercises = selectedExercises.map(se => ({
+          exercise_id: se.exercise.id,
+          target_sets: se.sets,
+          target_reps: se.reps
+        }));
+        const success = await workoutService.updateRoutine(routineToEdit.routine.id, title, formattedExercises);
+        if (!success) throw new Error('Errore durante l\'aggiornamento della scheda.');
+      } else {
+        // Create new routine
+        const { data: routineData, error: routineError } = await supabase
+          .from('routines')
+          .insert({ user_id: user.id, title })
+          .select()
+          .single();
+          
+        if (routineError) throw routineError;
 
-      // 2. Insert Routine Exercises
-      const routineExercises = selectedExercises.map((se, index) => ({
-        routine_id: routineData.id,
-        exercise_id: se.exercise.id,
-        order_index: index,
-        target_sets: se.sets,
-        target_reps: se.reps
-      }));
+        const routineExercises = selectedExercises.map((se, index) => ({
+          routine_id: routineData.id,
+          exercise_id: se.exercise.id,
+          order_index: index,
+          target_sets: se.sets,
+          target_reps: se.reps
+        }));
 
-      const { error: exercisesError } = await supabase
-        .from('routine_exercises')
-        .insert(routineExercises);
+        const { error: exercisesError } = await supabase
+          .from('routine_exercises')
+          .insert(routineExercises);
 
-      if (exercisesError) throw exercisesError;
+        if (exercisesError) throw exercisesError;
+      }
 
       onSave(); // Refresh routines
       onClose();
@@ -69,7 +86,7 @@ export const RoutineBuilder: React.FC<RoutineBuilderProps> = ({ onClose, onSave 
         <button onClick={onClose} className="p-2 -ml-2 text-slate-400">
           <X className="w-6 h-6" />
         </button>
-        <h2 className="text-lg font-bold text-white">Nuova Scheda</h2>
+        <h2 className="text-lg font-bold text-white">{routineToEdit ? 'Modifica Scheda' : 'Nuova Scheda'}</h2>
         <button 
           onClick={handleSave} 
           disabled={isSaving || !title.trim() || selectedExercises.length === 0}
