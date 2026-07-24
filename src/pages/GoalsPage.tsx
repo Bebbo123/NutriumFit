@@ -276,9 +276,9 @@ export const GoalsPage: React.FC = () => {
             </div>
             <button
               onClick={() => setIsEditing(true)}
-              className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-bold rounded-xl border border-slate-750 transition-colors cursor-pointer"
+              className="py-2 px-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
             >
-              Modifica
+              <span>✏️ Modifica Obiettivi</span>
             </button>
           </div>
 
@@ -303,9 +303,17 @@ export const GoalsPage: React.FC = () => {
 
           {/* Macro Split Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-1.5">
-              Distribuzione Macronutrienti
-            </h3>
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                Distribuzione Macronutrienti
+              </h3>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="text-[11px] font-bold font-mono px-2.5 py-1 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 transition-all cursor-pointer flex items-center gap-1"
+              >
+                <span>Modalità: <strong>{goals.macroInputMode === 'percentages' ? 'Percentuali (%)' : 'Grammi (g)'}</strong></span>
+              </button>
+            </div>
             <div className="space-y-2.5">
               {/* Carbs */}
               <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 border border-slate-800/80">
