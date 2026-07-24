@@ -9,6 +9,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { WorkoutPage } from './pages/WorkoutPage';
 import { LiveWorkoutModal } from './components/workout/LiveWorkoutModal';
 import { RestTimerOverlay } from './components/workout/RestTimerOverlay';
+import { IosPwaPrompt } from './components/ui/IosPwaPrompt';
 import type { MealType } from './types/diary';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/auth/AuthScreen';
@@ -214,9 +215,10 @@ function AppContent() {
         />
       )}
 
-      {/* Global Workout Overlays */}
+      {/* Global Overlays & PWA Prompts */}
       <LiveWorkoutModal />
       <RestTimerOverlay />
+      <IosPwaPrompt />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { NotificationSettings } from '../components/profile/NotificationSettings';
 import { User, Crown, Smartphone, Download, LogOut, ChevronRight, Bell, AlertTriangle, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDiaryStore } from '../store/diaryStore';
@@ -368,6 +369,9 @@ export const ProfilePage: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Notification Settings */}
+      <NotificationSettings />
 
       {/* Export Options Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 mb-5 shadow-sm space-y-4">
