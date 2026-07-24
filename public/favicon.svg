@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#0F172A"/>
+  <!-- Macro Ring Background -->
+  <circle cx="256" cy="256" r="160" stroke="#1E293B" stroke-width="36" />
+  <!-- Carbs Blue Arc -->
+  <path d="M 256 96 A 160 160 0 0 1 416 256" stroke="#3B82F6" stroke-width="36" stroke-linecap="round" />
+  <!-- Protein Green Arc -->
+  <path d="M 416 256 A 160 160 0 0 1 256 416" stroke="#22C55E" stroke-width="36" stroke-linecap="round" />
+  <!-- Fat Red Arc -->
+  <path d="M 256 416 A 160 160 0 0 1 120 336" stroke="#EF4444" stroke-width="36" stroke-linecap="round" />
+  <!-- Flame/Energy Center Icon -->
+  <path d="M256 160C256 160 216 210 216 250C216 272.091 233.909 290 256 290C278.091 290 296 272.091 296 250C296 210 256 160 256 160Z" fill="#06B6D4" />
+  <path d="M256 200C256 200 236 230 236 252C236 263.046 244.954 272 256 272C267.046 272 276 263.046 276 252C276 230 256 200 256 200Z" fill="#38BDF8" />
+</svg>

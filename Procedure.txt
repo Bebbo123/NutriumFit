@@ -1,0 +1,20 @@
+Per avviare l'applicazione per la prima volta (o dopo aver chiuso l'ambiente), puoi seguire questi passaggi:
+
+1. Avviare il server di sviluppo tramite terminale
+Apri il tuo terminale (PowerShell, Prompt dei comandi o il terminale integrato del tuo editor) posizionandoti nella cartella del progetto c:\Users\Shadow\Documents\GitHub\NutriumFit ed esegui il seguente comando:
+
+bash
+npm run dev or npm.cmd run dev
+
+Questo comando avvierà il server locale di Vite.
+
+2. Aprire l'applicazione nel browser
+Una volta avviato, il terminale ti mostrerà un indirizzo locale. Di solito è: 👉 http://localhost:5173
+
+Ti basterà cliccare sul link o aprirlo manualmente nel tuo browser per visualizzare l'applicazione in tempo reale.
+
+Se preferisci che avvii io il server per te in background in questo momento, fammelo sapere e provvederò subito!
+
+SUPABASE: https://bgaeaongvofvnsopousk.supabase.co
+        password: !123Ernesto1989!
+        VITE_SUPABASE_ANON_KEY=sb_publishable_hCtTjmeUA_ocpw2-fo-9FQ_kAP1enTA
