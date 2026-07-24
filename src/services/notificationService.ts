@@ -99,8 +99,8 @@ export const notificationService = {
       let subscription = await registration.pushManager.getSubscription();
 
       if (!subscription) {
-        // Sample public VAPID key (or user provided key)
-        const publicVapidKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDnA45A-8_aW773cZ0g9g-383-w';
+        // Read VAPID public key from env with fallback
+        const publicVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BKL9CHxTKoVCxODkykDT_As8y6MRpgdvYxMtiR38VBJDug-vSd68Mj_HiRb819prz899LPMQeE1_Tm1HYlJs3Q0';
         
         // Subscribe to push manager
         subscription = await registration.pushManager.subscribe({
