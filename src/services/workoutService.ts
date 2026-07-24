@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabaseClient';
-import type { Exercise, Routine, RoutineExercise } from '../types/workout';
+import type { Exercise, Routine, RoutineExercise, PreviousSetPerformance, ExercisePR, ExerciseHistoryPoint } from '../types/workout';
 
 export const workoutService = {
   /**
@@ -165,5 +165,63 @@ export const workoutService = {
     }
     
     return data.reduce((sum, log) => sum + (log.calories_burned || 0), 0);
+  },
+
+  /**
+   * Fetches previous performance sets for a specific exercise.
+   */
+  async fetchPreviousPerformance(userId: string, exerciseId: string): Promise<PreviousSetPerformance[]> {
+    if (!navigator.onLine) return [];
+    
+    const { data, error } = await supabase.rpc('get_last_exercise_performance', {
+      p_user_id: userId,
+      p_exercise_id: exerciseId
+    });
+
+    if (error) {
+      console.error('Error fetching previous performance:', error);
+      return [];
+    }
+    return (data || []) as PreviousSetPerformance[];
+  },
+
+  /**
+   * Fetches all-time PRs (Max Weight, Max 1RM) for a specific exercise.
+   */
+  async fetchExercisePR(userId: string, exerciseId: string): Promise<ExercisePR> {
+    if (!navigator.onLine) return { max_weight: 0, max_1rm: 0 };
+    
+    const { data, error } = await supabase.rpc('get_exercise_all_time_pr', {
+      p_user_id: userId,
+      p_exercise_id: exerciseId
+    });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.error('Error fetching exercise PR:', error);
+      return { max_weight: 0, max_1rm: 0 };
+    }
+    
+    return {
+      max_weight: Number(data[0].max_weight || 0),
+      max_1rm: Number(data[0].max_1rm || 0)
+    };
+  },
+
+  /**
+   * Fetches historical progression over time for analytics charts.
+   */
+  async fetchExerciseHistory(userId: string, exerciseId: string): Promise<ExerciseHistoryPoint[]> {
+    if (!navigator.onLine) return [];
+
+    const { data, error } = await supabase.rpc('get_exercise_history', {
+      p_user_id: userId,
+      p_exercise_id: exerciseId
+    });
+
+    if (error) {
+      console.error('Error fetching exercise history:', error);
+      return [];
+    }
+    return (data || []) as ExerciseHistoryPoint[];
   }
 };

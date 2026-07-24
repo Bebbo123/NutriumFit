@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Dumbbell, Plus, Play, List, Clock, ChevronRight } from 'lucide-react';
+import { Dumbbell, Plus, Play, List, Clock, ChevronRight, TrendingUp } from 'lucide-react';
 import { useWorkoutStore } from '../store/workoutStore';
 import { workoutService } from '../services/workoutService';
 import { useAuth } from '../context/AuthContext';
 import { RoutineBuilder } from '../components/workout/RoutineBuilder';
+import { WorkoutAnalyticsPage } from './WorkoutAnalyticsPage';
 import type { Routine } from '../types/workout';
 
 export const WorkoutPage: React.FC = () => {
@@ -19,6 +20,7 @@ export const WorkoutPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'routines' | 'exercises'>('routines');
   const [isLoading, setIsLoading] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -37,23 +39,42 @@ export const WorkoutPage: React.FC = () => {
   }, [user, setRoutines, setExercises]);
 
   const handleStartEmptyWorkout = () => {
-    startWorkout('Allenamento Libero');
+    if (user) {
+      startWorkout('Allenamento Libero', undefined, user.id);
+    } else {
+      startWorkout('Allenamento Libero');
+    }
   };
 
   const handleStartRoutine = async (routine: Routine) => {
-    // Fetch the routine exercises before starting
     const routineExercises = await workoutService.fetchRoutineExercises(routine.id);
-    startWorkout(routine.title, { routine, exercises: routineExercises });
+    if (user) {
+      startWorkout(routine.title, { routine, exercises: routineExercises }, user.id);
+    } else {
+      startWorkout(routine.title, { routine, exercises: routineExercises });
+    }
   };
+
+  if (showAnalytics) {
+    return <WorkoutAnalyticsPage onBack={() => setShowAnalytics(false)} />;
+  }
 
   return (
     <div className="pb-24">
       {/* Header */}
       <div className="bg-slate-900 border-b border-slate-800 px-4 pt-12 pb-4 sticky top-0 z-30">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Dumbbell className="w-6 h-6 text-cyan-400" />
-          Allenamento
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Dumbbell className="w-6 h-6 text-cyan-400" />
+            Allenamento
+          </h1>
+          <button 
+            onClick={() => setShowAnalytics(true)}
+            className="text-xs font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-cyan-500/20 transition-all"
+          >
+            <TrendingUp className="w-4 h-4" /> Analisi
+          </button>
+        </div>
         
         {/* Sub-tabs */}
         <div className="flex bg-slate-950 p-1 rounded-xl mt-4">

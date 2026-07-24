@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Plus, Dumbbell, Timer, Minus } from 'lucide-react';
+import { X, Check, Plus, Dumbbell, Timer, Minus, Trophy, Copy } from 'lucide-react';
 import { useWorkoutStore } from '../../store/workoutStore';
 import { workoutService } from '../../services/workoutService';
 import { useAuth } from '../../context/AuthContext';
@@ -16,7 +16,8 @@ export const LiveWorkoutModal: React.FC = () => {
     addSet,
     removeSet,
     updateSet,
-    completeSet
+    completeSet,
+    copyPreviousPerformance
   } = useWorkoutStore();
 
   const [elapsed, setElapsed] = useState(0);
@@ -100,7 +101,23 @@ export const LiveWorkoutModal: React.FC = () => {
             {activeWorkout.exercises.map((ex, exIndex) => (
               <div key={ex.exercise.id + exIndex} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
                 <div className="p-3 border-b border-slate-800/50 bg-slate-900/50 flex justify-between items-center">
-                  <h3 className="font-bold text-cyan-50 text-sm text-shadow-sm">{ex.exercise.name}</h3>
+                  <div>
+                    <h3 className="font-bold text-cyan-50 text-sm text-shadow-sm">{ex.exercise.name}</h3>
+                    {ex.allTimePR && (ex.allTimePR.max_weight > 0 || ex.allTimePR.max_1rm > 0) && (
+                      <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1 mt-0.5">
+                        <Trophy className="w-3 h-3 text-amber-400" /> Record: {ex.allTimePR.max_weight}kg | 1RM: {ex.allTimePR.max_1rm}kg
+                      </span>
+                    )}
+                  </div>
+                  {ex.previousSets && ex.previousSets.length > 0 && (
+                    <button 
+                      onClick={() => copyPreviousPerformance(ex.exercise.id)}
+                      className="text-xs font-bold text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors"
+                      title="Copia dati dalla volta precedente"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copia Prec.
+                    </button>
+                  )}
                 </div>
                 
                 <div className="p-2 space-y-1 bg-slate-950/50">
@@ -115,70 +132,83 @@ export const LiveWorkoutModal: React.FC = () => {
 
                   {/* Sets Rows */}
                   {ex.sets.map((set) => (
-                    <div 
-                      key={set.id} 
-                      className={`grid grid-cols-12 gap-2 items-center px-2 py-1.5 rounded-lg transition-colors ${
-                        set.is_completed ? 'bg-emerald-950/30' : ''
-                      }`}
-                    >
-                      <div className="col-span-2 text-center">
-                        <span className="w-6 h-6 rounded-md bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 mx-auto">
-                          {set.set_number}
-                        </span>
-                      </div>
-                      <div className="col-span-3">
-                        <input 
-                          type="number"
-                          value={set.weight || ''}
-                          onChange={(e) => updateSet(ex.exercise.id, set.id, { weight: parseFloat(e.target.value) })}
-                          className={`w-full bg-slate-800 text-center rounded-lg py-1.5 text-sm font-bold border outline-none focus:border-cyan-500 transition-colors ${
-                            set.is_completed ? 'text-emerald-400 border-transparent' : 'text-white border-slate-700'
-                          }`}
-                          placeholder="-"
-                        />
-                      </div>
-                      <div className="col-span-3">
-                        <input 
-                          type="number"
-                          value={set.reps || ''}
-                          onChange={(e) => updateSet(ex.exercise.id, set.id, { reps: parseInt(e.target.value) })}
-                          className={`w-full bg-slate-800 text-center rounded-lg py-1.5 text-sm font-bold border outline-none focus:border-cyan-500 transition-colors ${
-                            set.is_completed ? 'text-emerald-400 border-transparent' : 'text-white border-slate-700'
-                          }`}
-                          placeholder="-"
-                        />
-                      </div>
-                      <div className="col-span-2 flex justify-center">
-                        <button 
-                          onClick={() => updateSet(ex.exercise.id, set.id, { set_type: set.set_type === 'normal' ? 'warmup' : 'normal' })}
-                          className={`text-[10px] font-bold uppercase rounded px-1.5 py-0.5 ${
-                            set.set_type === 'warmup' ? 'bg-orange-500/20 text-orange-400' : 'text-slate-500'
-                          }`}
-                        >
-                          {set.set_type === 'warmup' ? 'W' : 'N'}
-                        </button>
-                      </div>
-                      <div className="col-span-2 flex justify-center items-center gap-1">
-                        <button
-                          onClick={() => completeSet(ex.exercise.id, set.id, !set.is_completed)}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                            set.is_completed 
-                              ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20 text-white scale-105' 
-                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                          }`}
-                        >
-                          <Check className="w-5 h-5 stroke-[3]" />
-                        </button>
-                        {/* Option to delete set if not completed */}
-                        {!set.is_completed && (
+                    <div key={set.id} className="space-y-1">
+                      <div 
+                        className={`grid grid-cols-12 gap-2 items-center px-2 py-1.5 rounded-lg transition-colors ${
+                          set.is_completed ? 'bg-emerald-950/30' : ''
+                        }`}
+                      >
+                        <div className="col-span-2 text-center flex flex-col items-center">
+                          <span className="w-6 h-6 rounded-md bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">
+                            {set.set_number}
+                          </span>
+                          {(set.prev_weight !== null && set.prev_weight !== undefined) || (set.prev_reps !== null && set.prev_reps !== undefined) ? (
+                            <span className="text-[9px] text-slate-400 font-mono leading-none mt-1">
+                              {set.prev_weight ?? '-'}k×{set.prev_reps ?? '-'}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="col-span-3">
+                          <input 
+                            type="number"
+                            value={set.weight || ''}
+                            onChange={(e) => updateSet(ex.exercise.id, set.id, { weight: parseFloat(e.target.value) })}
+                            className={`w-full bg-slate-800 text-center rounded-lg py-1.5 text-sm font-bold border outline-none focus:border-cyan-500 transition-colors ${
+                              set.is_completed ? 'text-emerald-400 border-transparent' : 'text-white border-slate-700'
+                            }`}
+                            placeholder={set.prev_weight ? `${set.prev_weight}` : "-"}
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <input 
+                            type="number"
+                            value={set.reps || ''}
+                            onChange={(e) => updateSet(ex.exercise.id, set.id, { reps: parseInt(e.target.value) })}
+                            className={`w-full bg-slate-800 text-center rounded-lg py-1.5 text-sm font-bold border outline-none focus:border-cyan-500 transition-colors ${
+                              set.is_completed ? 'text-emerald-400 border-transparent' : 'text-white border-slate-700'
+                            }`}
+                            placeholder={set.prev_reps ? `${set.prev_reps}` : "-"}
+                          />
+                        </div>
+                        <div className="col-span-2 flex justify-center">
                           <button 
-                            onClick={() => removeSet(ex.exercise.id, set.id)}
-                            className="text-red-400/50 hover:text-red-400 p-1"
+                            onClick={() => updateSet(ex.exercise.id, set.id, { set_type: set.set_type === 'normal' ? 'warmup' : 'normal' })}
+                            className={`text-[10px] font-bold uppercase rounded px-1.5 py-0.5 ${
+                              set.set_type === 'warmup' ? 'bg-orange-500/20 text-orange-400' : 'text-slate-500'
+                            }`}
                           >
-                            <Minus className="w-4 h-4" />
+                            {set.set_type === 'warmup' ? 'W' : 'N'}
                           </button>
-                        )}
+                        </div>
+                        <div className="col-span-2 flex justify-center items-center gap-1">
+                          <button
+                            onClick={() => completeSet(ex.exercise.id, set.id, !set.is_completed)}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                              set.is_completed 
+                                ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20 text-white scale-105' 
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                            }`}
+                          >
+                            <Check className="w-5 h-5 stroke-[3]" />
+                          </button>
+                          {!set.is_completed && (
+                            <button 
+                              onClick={() => removeSet(ex.exercise.id, set.id)}
+                              className="text-red-400/50 hover:text-red-400 p-1"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
+
+                      {/* PR Badge Banner */}
+                      {set.is_completed && set.is_pr && (
+                        <div className="px-3 py-1 bg-amber-500/15 border border-amber-500/30 rounded-lg flex items-center justify-center gap-1.5 text-amber-400 text-xs font-bold animate-bounce">
+                          <Trophy className="w-4 h-4 text-amber-400" />
+                          {set.pr_type === 'both' ? 'RECORD PERSONALE! (Peso & 1RM)' : set.pr_type === 'weight' ? 'RECORD PERSONALE! (Max Peso)' : 'RECORD PERSONALE! (Max 1RM)'}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -218,7 +248,7 @@ export const LiveWorkoutModal: React.FC = () => {
               <button
                 key={ex.id}
                 onClick={() => {
-                  addExerciseToWorkout(ex);
+                  addExerciseToWorkout(ex, user?.id);
                   setShowExercisePicker(false);
                 }}
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 flex justify-between items-center hover:border-cyan-500/50 transition-colors text-left"

@@ -51,10 +51,31 @@ export interface WorkoutSet {
   is_completed: boolean;
   created_at?: string;
   
-  // Useful for the active workout UI to keep track of a temporary set before it's saved.
+  // Active UI & Historical features
   is_temporary?: boolean; 
   prev_weight?: number | null;
   prev_reps?: number | null;
+  is_pr?: boolean;
+  pr_type?: 'weight' | '1rm' | 'both';
+}
+
+export interface PreviousSetPerformance {
+  set_number: number;
+  weight: number;
+  reps: number;
+  completed_at: string;
+}
+
+export interface ExercisePR {
+  max_weight: number;
+  max_1rm: number;
+}
+
+export interface ExerciseHistoryPoint {
+  workout_date: string;
+  max_weight: number;
+  max_1rm: number;
+  total_volume: number;
 }
 
 // Extends WorkoutLog with its deeply nested sets for the UI
