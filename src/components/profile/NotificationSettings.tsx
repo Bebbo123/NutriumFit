@@ -83,6 +83,18 @@ export const NotificationSettings: React.FC = () => {
     }
   };
 
+  const [isTesting, setIsTesting] = useState(false);
+
+  const handleTestNotification = async () => {
+    if (!user) return;
+    setIsTesting(true);
+    const ok = await notificationService.sendTestNotification(user.id);
+    if (!ok) {
+      alert('Impossibile inviare la notifica. Verificare che le notifiche siano consentite per NutriumFit.');
+    }
+    setIsTesting(false);
+  };
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 mb-5 shadow-lg">
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
@@ -186,26 +198,37 @@ export const NotificationSettings: React.FC = () => {
             </div>
           </div>
 
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
-              saveSuccess 
-                ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
-                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20'
-            }`}
-          >
-            {saveSuccess ? (
-              <>
-                <Check className="w-4 h-4" /> Impostazioni Salvate!
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" /> {isSaving ? 'Salvataggio...' : 'Salva Promemoria'}
-              </>
-            )}
-          </button>
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
+                saveSuccess 
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/20' 
+                  : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20'
+              }`}
+            >
+              {saveSuccess ? (
+                <>
+                  <Check className="w-4 h-4" /> Impostazioni Salvate!
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" /> {isSaving ? 'Salvataggio...' : 'Salva Promemoria'}
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleTestNotification}
+              disabled={isTesting}
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-700"
+            >
+              <Bell className="w-3.5 h-3.5 text-cyan-400" />
+              {isTesting ? 'Invio in corso...' : 'Testa Notifica Push'}
+            </button>
+          </div>
         </div>
       )}
     </div>

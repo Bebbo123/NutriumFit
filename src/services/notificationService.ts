@@ -118,6 +118,64 @@ export const notificationService = {
   },
 
   /**
+   * Force unsubscribes any old push subscription and registers a fresh one.
+   */
+  async renewPushSubscription(userId: string): Promise<boolean> {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn('Push messaging is not supported.');
+      return false;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const existingSub = await registration.pushManager.getSubscription();
+
+      if (existingSub) {
+        await existingSub.unsubscribe();
+      }
+
+      const publicVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BKL9CHxTKoVCxODkykDT_As8y6MRpgdvYxMtiR38VBJDug-vSd68Mj_HiRb819prz899LPMQeE1_Tm1HYlJs3Q0';
+      
+      const newSub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: this.urlBase64ToUint8Array(publicVapidKey) as unknown as BufferSource
+      });
+
+      return await this.saveSettings(userId, { enabled: true }, newSub.toJSON());
+    } catch (err) {
+      console.error('Error renewing push subscription:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Triggers an immediate test notification.
+   */
+  async sendTestNotification(userId: string): Promise<boolean> {
+    if (Notification.permission !== 'granted') {
+      const granted = await this.requestPermission();
+      if (!granted) return false;
+    }
+
+    try {
+      // First ensure subscription is fresh
+      await this.renewPushSubscription(userId);
+
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification('🧪 Notifica di Prova NutriumFit', {
+        body: 'Le notifiche push in background funzionano perfettamente!',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { url: '/' }
+      });
+      return true;
+    } catch (err) {
+      console.error('Error triggering test notification:', err);
+      return false;
+    }
+  },
+
+  /**
    * Helper to convert VAPID base64 key to Uint8Array.
    */
   urlBase64ToUint8Array(base64String: string): Uint8Array {
