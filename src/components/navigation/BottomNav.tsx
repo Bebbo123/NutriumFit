@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, BookOpen, Plus, Target, User } from 'lucide-react';
+import { Home, BookOpen, Plus, Target, User, Dumbbell } from 'lucide-react';
 
-export type NavTab = 'home' | 'diary' | 'add' | 'goals' | 'profile';
+export type NavTab = 'home' | 'diary' | 'add' | 'goals' | 'workout' | 'profile';
 
 interface BottomNavProps {
   activeTab: NavTab;
@@ -18,6 +18,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     { id: 'home' as NavTab, label: 'Home', icon: Home },
     { id: 'diary' as NavTab, label: 'Diario', icon: BookOpen },
     { id: 'add' as NavTab, label: 'Aggiungi', icon: Plus, isAction: true },
+    { id: 'workout' as NavTab, label: 'Workout', icon: Dumbbell },
     { id: 'goals' as NavTab, label: 'Obiettivi', icon: Target },
     { id: 'profile' as NavTab, label: 'Profilo', icon: User },
   ];

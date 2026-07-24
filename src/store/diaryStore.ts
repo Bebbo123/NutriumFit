@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DailyGoals, LoggedFood, MealType, FoodItem, Macros, Recipe, RecipeIngredient, SavedMeal, SavedMealItem } from '../types/diary';
 import { diaryService } from '../services/diaryService';
+import { workoutService } from '../services/workoutService';
 import { db } from '../utils/db';
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
@@ -31,6 +32,7 @@ interface DiaryStore {
   syncOfflineQueue: () => Promise<void>;
   fetchGoals: (userId: string) => Promise<void>;
   fetchLogsForDate: (userId: string, date: string) => Promise<void>;
+  fetchExerciseCalories: (userId: string, date: string) => Promise<void>;
   addFoodLog: (userId: string, date: string, food: FoodItem, mealType: MealType, servings?: number) => Promise<void>;
   removeFoodLog: (date: string, logId: string) => Promise<void>;
   updateWaterIntake: (userId: string, date: string, amountMl: number) => Promise<void>;
@@ -88,6 +90,15 @@ export const useDiaryStore = create<DiaryStore>()(
       setSelectedDate: (date) => set({ selectedDate: date }),
       setIsOffline: (status) => set({ isOffline: status }),
       setDeferredPrompt: (prompt) => set({ deferredPrompt: prompt }),
+
+      fetchExerciseCalories: async (userId, date) => {
+        try {
+          const calories = await workoutService.fetchTodayWorkoutCalories(userId, date);
+          set({ exerciseCalories: calories });
+        } catch (e) {
+          console.error('Error fetching exercise calories:', e);
+        }
+      },
 
       syncOfflineQueue: async () => {
         const queue = await db.offlineQueue.orderBy('timestamp').toArray();
@@ -225,6 +236,10 @@ export const useDiaryStore = create<DiaryStore>()(
               [date]: dbWater,
             },
           }));
+
+          // Fetch daily active calories burned from workouts
+          await get().fetchExerciseCalories(userId, date);
+
         } catch (err) {
           console.error('Error in fetchLogsForDate store action:', err);
         } finally {

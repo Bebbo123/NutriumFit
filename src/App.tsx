@@ -6,6 +6,9 @@ import { DiaryPage } from './pages/DiaryPage';
 import { AddFoodPage } from './pages/AddFoodPage';
 import { GoalsPage } from './pages/GoalsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { WorkoutPage } from './pages/WorkoutPage';
+import { LiveWorkoutModal } from './components/workout/LiveWorkoutModal';
+import { RestTimerOverlay } from './components/workout/RestTimerOverlay';
 import type { MealType } from './types/diary';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/auth/AuthScreen';
@@ -197,6 +200,8 @@ function AppContent() {
 
         {activeTab === 'goals' && <GoalsPage />}
 
+        {activeTab === 'workout' && <WorkoutPage />}
+
         {activeTab === 'profile' && <ProfilePage />}
       </main>
 
@@ -208,6 +213,10 @@ function AppContent() {
           onQuickAddClick={() => handleOpenAddFood('Colazione')}
         />
       )}
+
+      {/* Global Workout Overlays */}
+      <LiveWorkoutModal />
+      <RestTimerOverlay />
     </div>
   );
 }
