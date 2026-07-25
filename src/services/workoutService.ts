@@ -60,6 +60,51 @@ export const workoutService = {
   },
 
   /**
+   * Updates an existing custom exercise.
+   */
+  async updateCustomExercise(
+    exerciseId: string,
+    name: string,
+    muscleGroup: MuscleGroup,
+    equipment: Equipment
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('exercises')
+        .update({
+          name,
+          muscle_group: muscleGroup,
+          equipment,
+        })
+        .eq('id', exerciseId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating custom exercise:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Deletes a custom exercise.
+   */
+  async deleteCustomExercise(exerciseId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('id', exerciseId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting custom exercise:', err);
+      return false;
+    }
+  },
+
+  /**
    * Fetches routines for a user.
    */
   async fetchRoutines(userId: string): Promise<Routine[]> {
@@ -139,13 +184,27 @@ export const workoutService = {
         logPayload.notes = workout.notes;
       }
 
-      const { data: logData, error: logError } = await supabase
+      let logData: any = null;
+      let { data: initialLogData, error: logError } = await supabase
         .from('workout_logs')
         .insert(logPayload)
         .select()
         .single();
         
-      if (logError) throw logError;
+      logData = initialLogData;
+
+      if (logError && logError.message?.includes('notes')) {
+        delete logPayload.notes;
+        const retryRes = await supabase
+          .from('workout_logs')
+          .insert(logPayload)
+          .select()
+          .single();
+        logData = retryRes.data;
+        logError = retryRes.error;
+      }
+
+      if (logError || !logData) throw logError;
 
       const logId = logData.id;
 
@@ -177,7 +236,12 @@ export const workoutService = {
           .from('workout_sets')
           .insert(setsToInsert);
           
-        if (setsError) throw setsError;
+        if (setsError && setsError.message?.includes('notes')) {
+          const cleanSets = setsToInsert.map(({ notes, ...rest }) => rest);
+          await supabase.from('workout_sets').insert(cleanSets);
+        } else if (setsError) {
+          throw setsError;
+        }
       }
 
       return true;

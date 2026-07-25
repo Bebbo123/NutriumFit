@@ -30,6 +30,8 @@ interface WorkoutStore {
   
   // Actions
   setExercises: (exercises: Exercise[]) => void;
+  updateCustomExerciseStore: (exerciseId: string, updatedExercise: Exercise) => void;
+  deleteCustomExerciseStore: (exerciseId: string) => void;
   setRoutines: (routines: Routine[]) => void;
   setRoutineExercises: (routineId: string, exercises: RoutineExercise[]) => void;
   
@@ -65,6 +67,14 @@ export const useWorkoutStore = create<WorkoutStore>()(
       restTimerDuration: 90,
 
       setExercises: (exercises) => set({ exercises }),
+      updateCustomExerciseStore: (exerciseId, updatedExercise) =>
+        set((state) => ({
+          exercises: state.exercises.map((ex) => (ex.id === exerciseId ? updatedExercise : ex)),
+        })),
+      deleteCustomExerciseStore: (exerciseId) =>
+        set((state) => ({
+          exercises: state.exercises.filter((ex) => ex.id !== exerciseId),
+        })),
       setRoutines: (routines) => set({ routines }),
       setRoutineExercises: (routineId, exercises) => 
         set((state) => ({ 

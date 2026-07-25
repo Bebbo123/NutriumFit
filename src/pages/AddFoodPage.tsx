@@ -1177,154 +1177,158 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
 
       {/* Selected Food Servings adjustment modal popup with Dual Selector */}
       {selectedFoodForServing && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6">
-            <h3 className="text-lg font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
-            <p className="text-xs text-slate-400 mb-3">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
+        <div className="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[85vh] flex flex-col">
+            <div className="overflow-y-auto pr-1 flex-1 space-y-4 pb-28">
+              <h3 className="text-lg font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
+              <p className="text-xs text-slate-400 mb-3">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
 
-            {/* Segmented Toggle Control */}
-            <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setPortionMode('grams');
-                  setServingsInput(totalWeightInGrams);
-                }}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  portionMode === 'grams'
-                    ? 'bg-cyan-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Grammi (g)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPortionMode('portions');
-                  setPortionCountInput(Math.round((totalWeightInGrams / unitWeightGrams) * 10) / 10 || 1);
-                }}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  portionMode === 'portions'
-                    ? 'bg-cyan-500 text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Porzioni
-              </button>
-            </div>
-
-            {/* Live Calculated Macros Badge */}
-            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 font-mono text-center">
-              <span className="text-2xl font-black text-cyan-400">
-                {calculatedValues.calories}{' '}
-                <span className="text-xs font-normal text-slate-400">kcal</span>
-              </span>
-              <div className="flex justify-center gap-4 text-xs mt-2 text-slate-300">
-                <span className="text-blue-400 font-semibold">
-                  {calculatedValues.carbs}g C
-                </span>
-                <span className="text-red-400 font-semibold">
-                  {calculatedValues.fat}g F
-                </span>
-                <span className="text-emerald-400 font-semibold">
-                  {calculatedValues.protein}g P
-                </span>
+              {/* Segmented Toggle Control */}
+              <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPortionMode('grams');
+                    setServingsInput(totalWeightInGrams);
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    portionMode === 'grams'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Grammi (g)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPortionMode('portions');
+                    setPortionCountInput(Math.round((totalWeightInGrams / unitWeightGrams) * 10) / 10 || 1);
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    portionMode === 'portions'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Porzioni
+                </button>
               </div>
-            </div>
 
-            {/* Quantity Controls */}
-            <div className="space-y-3 mb-5">
-              {portionMode === 'grams' ? (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-300">
-                      Peso in Grammi (g)
-                    </label>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      ≈ {(totalWeightInGrams / unitWeightGrams).toFixed(1)} porzioni
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    step="5"
-                    min="1"
-                    max="3000"
-                    inputMode="decimal"
-                    value={servingsInput}
-                    onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 1))}
-                    className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                  />
-                  <div className="flex gap-1.5 justify-center mt-2">
-                    {[50, 100, 150, 200, 250].map((presetG) => (
-                      <button
-                        key={presetG}
-                        type="button"
-                        onClick={() => setServingsInput(presetG)}
-                        className={`py-1 px-2.5 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                          servingsInput === presetG
-                            ? 'bg-cyan-500 text-slate-950 shadow-md'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        {presetG}g
-                      </button>
-                    ))}
-                  </div>
+              {/* Live Calculated Macros Badge */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 font-mono text-center">
+                <span className="text-2xl font-black text-cyan-400">
+                  {calculatedValues.calories}{' '}
+                  <span className="text-xs font-normal text-slate-400">kcal</span>
+                </span>
+                <div className="flex justify-center gap-4 text-xs mt-2 text-slate-300">
+                  <span className="text-blue-400 font-semibold">
+                    {calculatedValues.carbs}g C
+                  </span>
+                  <span className="text-red-400 font-semibold">
+                    {calculatedValues.fat}g F
+                  </span>
+                  <span className="text-emerald-400 font-semibold">
+                    {calculatedValues.protein}g P
+                  </span>
                 </div>
-              ) : (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-300">
-                      Numero di Porzioni
-                    </label>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      1 porzione = {unitWeightGrams}g
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="0.1"
-                    max="50"
-                    inputMode="decimal"
-                    value={portionCountInput}
-                    onChange={(e) => setPortionCountInput(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                    className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                  />
-                  <div className="flex gap-1.5 justify-center mt-2">
-                    {[0.5, 1, 1.5, 2, 3].map((presetP) => (
-                      <button
-                        key={presetP}
-                        type="button"
-                        onClick={() => setPortionCountInput(presetP)}
-                        className={`py-1 px-2 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                          portionCountInput === presetP
-                            ? 'bg-cyan-500 text-slate-950 shadow-md'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        {presetP} {presetP === 1 ? 'porz' : 'porzioni'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => setSelectedFoodForServing(null)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={handleConfirmServingAdd}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
-              >
-                Aggiungi a {selectedMeal}
-              </button>
+              {/* Quantity Controls */}
+              <div className="space-y-3 mb-5">
+                {portionMode === 'grams' ? (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-bold text-slate-300">
+                        Peso in Grammi (g)
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        ≈ {(totalWeightInGrams / unitWeightGrams).toFixed(1)} porzioni
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      step="5"
+                      min="1"
+                      max="3000"
+                      inputMode="decimal"
+                      value={servingsInput}
+                      onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 1))}
+                      className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                    />
+                    <div className="flex gap-1.5 justify-center mt-2">
+                      {[50, 100, 150, 200, 250].map((presetG) => (
+                        <button
+                          key={presetG}
+                          type="button"
+                          onClick={() => setServingsInput(presetG)}
+                          className={`py-1 px-2.5 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                            servingsInput === presetG
+                              ? 'bg-cyan-500 text-slate-950 shadow-md'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {presetG}g
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-bold text-slate-300">
+                        Numero di Porzioni
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        1 porzione = {unitWeightGrams}g
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0.1"
+                      max="50"
+                      inputMode="decimal"
+                      value={portionCountInput}
+                      onChange={(e) => setPortionCountInput(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                      className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                    />
+                    <div className="flex gap-1.5 justify-center mt-2">
+                      {[0.5, 1, 1.5, 2, 3].map((presetP) => (
+                        <button
+                          key={presetP}
+                          type="button"
+                          onClick={() => setPortionCountInput(presetP)}
+                          className={`py-1 px-2 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                            portionCountInput === presetP
+                              ? 'bg-cyan-500 text-slate-950 shadow-md'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {presetP} {presetP === 1 ? 'porz' : 'porzioni'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFoodForServing(null)}
+                  className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmServingAdd}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
+                >
+                  Aggiungi a {selectedMeal}
+                </button>
+              </div>
             </div>
           </div>
         </div>

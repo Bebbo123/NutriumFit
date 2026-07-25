@@ -1,24 +1,39 @@
-import React, { useState } from 'react';
-import { X, Plus, Dumbbell } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Save, Dumbbell } from 'lucide-react';
 import { workoutService } from '../../services/workoutService';
 import { useAuth } from '../../context/AuthContext';
 import type { Exercise, MuscleGroup, Equipment } from '../../types/workout';
 
 interface CreateExerciseModalProps {
   onClose: () => void;
-  onCreated: (exercise: Exercise) => void;
+  onCreated?: (exercise: Exercise) => void;
+  onUpdated?: (exercise: Exercise) => void;
+  exerciseToEdit?: Exercise | null;
 }
 
 const MUSCLE_GROUPS: MuscleGroup[] = ['Petto', 'Dorso', 'Spalle', 'Bicipiti', 'Tricipiti', 'Gambe', 'Core'];
 const EQUIPMENT_TYPES: Equipment[] = ['Bilanciere', 'Manubri', 'Macchina', 'Cavi', 'Corpo Libero'];
 
-export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({ onClose, onCreated }) => {
+export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({
+  onClose,
+  onCreated,
+  onUpdated,
+  exerciseToEdit,
+}) => {
   const { user } = useAuth();
-  const [name, setName] = useState('');
-  const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>('Petto');
-  const [equipment, setEquipment] = useState<Equipment>('Manubri');
+  const [name, setName] = useState(exerciseToEdit?.name || '');
+  const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(exerciseToEdit?.muscle_group || 'Petto');
+  const [equipment, setEquipment] = useState<Equipment>(exerciseToEdit?.equipment || 'Manubri');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (exerciseToEdit) {
+      setName(exerciseToEdit.name);
+      setMuscleGroup(exerciseToEdit.muscle_group);
+      setEquipment(exerciseToEdit.equipment);
+    }
+  }, [exerciseToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,18 +46,41 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({ onClos
     setError(null);
 
     try {
-      const created = await workoutService.createCustomExercise(
-        user?.id || 'offline_user',
-        name.trim(),
-        muscleGroup,
-        equipment
-      );
-
-      if (created) {
-        onCreated(created);
-        onClose();
+      if (exerciseToEdit) {
+        // Edit mode
+        const success = await workoutService.updateCustomExercise(
+          exerciseToEdit.id,
+          name.trim(),
+          muscleGroup,
+          equipment
+        );
+        if (success || !navigator.onLine) {
+          const updated: Exercise = {
+            ...exerciseToEdit,
+            name: name.trim(),
+            muscle_group: muscleGroup,
+            equipment,
+          };
+          if (onUpdated) onUpdated(updated);
+          onClose();
+        } else {
+          setError('Errore durante l\'aggiornamento dell\'esercizio.');
+        }
       } else {
-        setError('Errore durante la creazione dell\'esercizio.');
+        // Create mode
+        const created = await workoutService.createCustomExercise(
+          user?.id || 'offline_user',
+          name.trim(),
+          muscleGroup,
+          equipment
+        );
+
+        if (created) {
+          if (onCreated) onCreated(created);
+          onClose();
+        } else {
+          setError('Errore durante la creazione dell\'esercizio.');
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -63,8 +101,12 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({ onClos
               <Dumbbell className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-white">Nuovo Esercizio</h3>
-              <p className="text-xs text-slate-400">Crea un esercizio personalizzato</p>
+              <h3 className="text-base font-extrabold text-white">
+                {exerciseToEdit ? 'Modifica Esercizio' : 'Nuovo Esercizio'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {exerciseToEdit ? 'Aggiorna i dettagli dell\'esercizio' : 'Crea un esercizio personalizzato'}
+              </p>
             </div>
           </div>
           <button
@@ -144,8 +186,8 @@ export const CreateExerciseModal: React.FC<CreateExerciseModalProps> = ({ onClos
               disabled={isSaving || !name.trim()}
               className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              <Plus className="w-4 h-4" />
-              {isSaving ? 'Creazione...' : 'Crea Esercizio'}
+              {exerciseToEdit ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isSaving ? 'Salvataggio...' : exerciseToEdit ? 'Salva Modifiche' : 'Crea Esercizio'}
             </button>
           </div>
         </form>

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Dumbbell, Plus, Play, List, ChevronRight, TrendingUp, Edit3, Trash2, Calendar, FileText, Activity } from 'lucide-react';
+import { Dumbbell, Plus, Play, List, ChevronRight, TrendingUp, Edit3, Trash2, Calendar, FileText, Activity, Search } from 'lucide-react';
 import { useWorkoutStore } from '../store/workoutStore';
 import { workoutService } from '../services/workoutService';
 import { useDiaryStore } from '../store/diaryStore';
 import { useAuth } from '../context/AuthContext';
 import { RoutineBuilder } from '../components/workout/RoutineBuilder';
+import { CreateExerciseModal } from '../components/workout/CreateExerciseModal';
 import { WorkoutAnalyticsPage } from './WorkoutAnalyticsPage';
 import { WorkoutPdfExporter } from '../components/workout/WorkoutPdfExporter';
-import type { Routine, WorkoutLogWithSets, RoutineLastPerformed } from '../types/workout';
+import type { Routine, WorkoutLogWithSets, RoutineLastPerformed, Exercise } from '../types/workout';
 
 export const WorkoutPage: React.FC = () => {
   const { user } = useAuth();
@@ -17,12 +18,17 @@ export const WorkoutPage: React.FC = () => {
     routines, 
     setRoutines,
     exercises,
-    setExercises
+    setExercises,
+    updateCustomExerciseStore,
+    deleteCustomExerciseStore
   } = useWorkoutStore();
   
   const [activeTab, setActiveTab] = useState<'routines' | 'exercises' | 'history'>('routines');
   const [isLoading, setIsLoading] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showCreateExerciseModal, setShowCreateExerciseModal] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const [routineToEdit, setRoutineToEdit] = useState<{ routine: Routine; exercises: any[] } | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showPdfExporter, setShowPdfExporter] = useState(false);
@@ -127,6 +133,23 @@ export const WorkoutPage: React.FC = () => {
       .filter(l => new Date(l.completed_at) >= cutoff)
       .reverse(); // Chronological
   }, [historyLogs, cycleDaysFilter]);
+
+  const filteredExercises = useMemo(() => {
+    if (!exerciseSearch.trim()) return exercises;
+    const query = exerciseSearch.toLowerCase();
+    return exercises.filter(
+      (ex) =>
+        ex.name.toLowerCase().includes(query) ||
+        ex.muscle_group.toLowerCase().includes(query) ||
+        ex.equipment.toLowerCase().includes(query)
+    );
+  }, [exercises, exerciseSearch]);
+
+  const handleDeleteCustomExercise = async (exercise: Exercise) => {
+    if (!window.confirm(`Sei sicuro di voler eliminare l'esercizio "${exercise.name}"?`)) return;
+    await workoutService.deleteCustomExercise(exercise.id);
+    deleteCustomExerciseStore(exercise.id);
+  };
 
   if (showAnalytics) {
     return <WorkoutAnalyticsPage onBack={() => setShowAnalytics(false)} />;
@@ -339,23 +362,83 @@ export const WorkoutPage: React.FC = () => {
         {/* Exercises Tab */}
         {activeTab === 'exercises' && (
            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-slate-200">Database Esercizi</h3>
+              <div className="flex justify-between items-center mb-3">
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-200">Database Esercizi</h3>
+                  <p className="text-xs text-slate-400">Gestisci ed esegui i tuoi esercizi custom</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingExercise(null);
+                    setShowCreateExerciseModal(true);
+                  }}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 px-3 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-1 cursor-pointer shadow-md"
+                >
+                  <Plus className="w-4 h-4" /> Nuovo
+                </button>
+              </div>
+
+              {/* Search Input Bar */}
+              <div className="relative mb-4">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={exerciseSearch}
+                  onChange={(e) => setExerciseSearch(e.target.value)}
+                  placeholder="Cerca per nome, muscolo o attrezzatura..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-2xl py-2 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 outline-none focus:border-cyan-500"
+                />
               </div>
 
               {isLoading ? (
                 <div className="text-center py-8 text-slate-500">Caricamento...</div>
+              ) : filteredExercises.length === 0 ? (
+                <div className="text-center py-10 bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-400 text-xs">
+                  Nessun esercizio trovato.
+                </div>
               ) : (
                 <div className="grid gap-2">
-                  {exercises.map(exercise => (
-                    <div key={exercise.id} className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center">
+                  {filteredExercises.map(exercise => (
+                    <div key={exercise.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-3.5 flex justify-between items-center">
                       <div className="flex flex-col">
-                        <span className="font-bold text-slate-200 text-sm">{exercise.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-100 text-sm">{exercise.name}</span>
+                          {exercise.is_custom && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 font-bold border border-cyan-800/40">
+                              Custom
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">
                           {exercise.muscle_group} • {exercise.equipment}
                         </span>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-600" />
+
+                      <div className="flex items-center gap-1.5">
+                        {exercise.is_custom ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingExercise(exercise);
+                                setShowCreateExerciseModal(true);
+                              }}
+                              className="p-1.5 text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 rounded-xl border border-cyan-800/40 transition-colors cursor-pointer"
+                              title="Modifica Esercizio"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCustomExercise(exercise)}
+                              className="p-1.5 text-red-400 hover:text-red-300 bg-red-950/60 rounded-xl border border-red-800/40 transition-colors cursor-pointer"
+                              title="Elimina Esercizio"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-600" />
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -439,6 +522,25 @@ export const WorkoutPage: React.FC = () => {
             loadAllData();
             setShowBuilder(false);
             setRoutineToEdit(null);
+          }}
+        />
+      )}
+
+      {showCreateExerciseModal && (
+        <CreateExerciseModal
+          exerciseToEdit={editingExercise}
+          onClose={() => {
+            setShowCreateExerciseModal(false);
+            setEditingExercise(null);
+          }}
+          onCreated={(newEx) => {
+            setExercises([newEx, ...exercises]);
+            setShowCreateExerciseModal(false);
+          }}
+          onUpdated={(updatedEx) => {
+            updateCustomExerciseStore(updatedEx.id, updatedEx);
+            setShowCreateExerciseModal(false);
+            setEditingExercise(null);
           }}
         />
       )}
