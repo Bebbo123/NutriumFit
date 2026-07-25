@@ -13,6 +13,7 @@ import {
   Search,
   Tag,
   Settings2,
+  Star,
 } from 'lucide-react';
 import { useDiaryStore } from '../store/diaryStore';
 import { MOCK_FOOD_DATABASE } from '../data/mockFoods';
@@ -48,6 +49,10 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     userCustomPortions,
     fetchUserCustomPortions,
     setUserCustomPortion,
+    favoriteFoods,
+    favoriteFoodIds,
+    fetchFavoriteFoods,
+    toggleFavoriteFood,
     addFoodLog,
     fetchLogsForDate,
     logs,
@@ -271,6 +276,8 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
         return recentFoods;
       case 'frequent':
         return recentFoods.slice(0, 5);
+      case 'favorites':
+        return favoriteFoods;
       case 'my_foods':
         return customFoods.length > 0 ? customFoods : MOCK_FOOD_DATABASE.slice(0, 3);
       case 'meals':
@@ -278,13 +285,14 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
       default:
         return [];
     }
-  }, [searchQuery, activeTab, apiFoods, recentFoods, customFoods]);
+  }, [searchQuery, activeTab, apiFoods, recentFoods, favoriteFoods, customFoods]);
 
   useEffect(() => {
     if (user) {
       fetchUserCustomPortions(user.id);
+      fetchFavoriteFoods(user.id);
     }
-  }, [user, fetchUserCustomPortions]);
+  }, [user, fetchUserCustomPortions, fetchFavoriteFoods]);
 
   const unitWeightGrams = useMemo(() => {
     if (!selectedFoodForServing) return 100;
@@ -992,13 +1000,22 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
               <p className="text-xs text-slate-400 font-medium">Ricerca in corso su OpenFoodFacts...</p>
             </div>
           ) : displayedFoods.length === 0 ? (
-            <div className="py-12 text-center bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-              <p className="text-sm font-semibold text-slate-300 mb-1">Nessun risultato trovato</p>
-              <p className="text-xs text-slate-500">Prova a cercare termini generici come "Uova", "Riso" o "Pollo".</p>
-            </div>
+            activeTab === 'favorites' ? (
+              <div className="py-12 text-center bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center">
+                <Star className="w-8 h-8 text-amber-400/60 mb-2" />
+                <p className="text-sm font-semibold text-slate-300 mb-1">Nessun alimento preferito salvato</p>
+                <p className="text-xs text-slate-500 max-w-xs">Clicca sulla stella ★ presente su qualsiasi alimento per aggiungerlo ai tuoi preferiti!</p>
+              </div>
+            ) : (
+              <div className="py-12 text-center bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                <p className="text-sm font-semibold text-slate-300 mb-1">Nessun risultato trovato</p>
+                <p className="text-xs text-slate-500">Prova a cercare termini generici come "Uova", "Riso" o "Pollo".</p>
+              </div>
+            )
           ) : (
             displayedFoods.map((food) => {
               const isJustAdded = addedFoodIds.has(food.id);
+              const isFavorite = favoriteFoodIds.has(food.id);
 
               return (
                 <div
@@ -1030,9 +1047,23 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                      {(food.id.startsWith('off_') || food.id.startsWith('custom_')) ? 'Valori per 100g' : food.servingSize}
-                    </p>
+                    {(() => {
+                      const customG = userCustomPortions[food.id];
+                      if (customG) {
+                        const baseWeight = food.servingAmount || 100;
+                        const customKcal = Math.round((food.calories * customG) / baseWeight);
+                        return (
+                          <p className="text-xs text-cyan-400 mt-0.5 font-mono font-semibold">
+                            1 porzione da {customG}g • {customKcal} kcal
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                          {(food.id.startsWith('off_') || food.id.startsWith('custom_')) ? 'Valori per 100g' : food.servingSize}
+                        </p>
+                      );
+                    })()}
 
                     <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1 font-mono">
                       <span className="text-slate-200 font-bold">{food.calories} kcal</span>
@@ -1043,18 +1074,36 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Quick Add Button */}
-                  <button
-                    onClick={() => handleQuickAdd(food)}
-                    className={`p-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                      isJustAdded
-                        ? 'bg-emerald-500 text-slate-950'
-                        : 'bg-cyan-950 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-800/50'
-                    }`}
-                    title="Aggiunta rapida 1 porzione"
-                  >
-                    {isJustAdded ? <Check className="w-4 h-4 stroke-[3]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
-                  </button>
+                  {/* Action Buttons: Star Favorite & Quick Add */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (user) toggleFavoriteFood(user.id, food);
+                      }}
+                      className={`p-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                        isFavorite
+                          ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60 shadow-sm'
+                          : 'bg-slate-950 text-slate-500 hover:text-slate-200 border border-slate-800/80'
+                      }`}
+                      title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+                    >
+                      <Star className={`w-4 h-4 ${isFavorite ? 'fill-amber-400' : ''}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickAdd(food)}
+                      className={`p-2.5 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                        isJustAdded
+                          ? 'bg-emerald-500 text-slate-950'
+                          : 'bg-cyan-950 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-800/50'
+                      }`}
+                      title="Aggiunta rapida 1 porzione"
+                    >
+                      {isJustAdded ? <Check className="w-4 h-4 stroke-[3]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -1239,7 +1288,21 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                       </span>
                     )}
                   </div>
-                  <HealthScoreBadge score={selectedFoodForServing.healthScore || 75} size="sm" showBar={false} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => user && toggleFavoriteFood(user.id, selectedFoodForServing)}
+                      className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                        favoriteFoodIds.has(selectedFoodForServing.id)
+                          ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60 shadow-sm'
+                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                      title={favoriteFoodIds.has(selectedFoodForServing.id) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+                    >
+                      <Star className={`w-4 h-4 ${favoriteFoodIds.has(selectedFoodForServing.id) ? 'fill-amber-400' : ''}`} />
+                    </button>
+                    <HealthScoreBadge score={selectedFoodForServing.healthScore || 75} size="sm" showBar={false} />
+                  </div>
                 </div>
 
                 {/* Live Macro Remaining Preview Rings */}

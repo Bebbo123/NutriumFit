@@ -41,6 +41,13 @@ export interface CachedUserPortion {
   portionWeightG: number;
 }
 
+export interface CachedFavoriteFood {
+  key: string; // userId_foodId
+  userId: string;
+  foodId: string;
+  foodJson: string;
+}
+
 export interface OfflineAction {
   id?: number;
   action: 'addFood' | 'removeFood' | 'updateWater' | 'logWeight' | 'deleteWeight' | 'updateGoals';
@@ -54,16 +61,18 @@ class NutriumFitDatabase extends Dexie {
   waterLogs!: Table<CachedWaterLog>;
   customFoods!: Table<CachedCustomFood>;
   userPortions!: Table<CachedUserPortion>;
+  favorites!: Table<CachedFavoriteFood>;
   offlineQueue!: Table<OfflineAction>;
 
   constructor() {
     super('NutriumFitDatabase');
-    this.version(2).stores({
+    this.version(3).stores({
       logs: 'logId, userId, date',
       weightLogs: 'key, userId, date',
       waterLogs: 'key, userId, date',
       customFoods: 'id, userId, name',
       userPortions: 'key, userId, foodId',
+      favorites: 'key, userId, foodId',
       offlineQueue: '++id, action, timestamp',
     });
   }

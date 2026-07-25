@@ -18,6 +18,8 @@ interface DiaryStore {
   recipes: Recipe[];
   savedMeals: SavedMeal[];
   userCustomPortions: Record<string, number>;
+  favoriteFoods: FoodItem[];
+  favoriteFoodIds: Set<string>;
   isLoadingLogs: boolean;
   isLoadingGoals: boolean;
   isLoadingWeightLogs: boolean;
@@ -36,6 +38,8 @@ interface DiaryStore {
   fetchExerciseCalories: (userId: string, date: string) => Promise<void>;
   fetchUserCustomPortions: (userId: string) => Promise<void>;
   setUserCustomPortion: (userId: string, foodId: string, portionWeightG: number) => Promise<void>;
+  fetchFavoriteFoods: (userId: string) => Promise<void>;
+  toggleFavoriteFood: (userId: string, food: FoodItem) => Promise<void>;
   addFoodLog: (userId: string, date: string, food: FoodItem, mealType: MealType, servings?: number) => Promise<void>;
   updateFoodLog: (date: string, logId: string, mealType: MealType, foodName: string, calories: number, carbs: number, fat: number, protein: number, servings?: number, servingSizeDisplay?: string, brand?: string, healthScore?: number) => Promise<void>;
   removeFoodLog: (date: string, logId: string) => Promise<void>;
@@ -84,6 +88,8 @@ export const useDiaryStore = create<DiaryStore>()(
       recipes: [],
       savedMeals: [],
       userCustomPortions: {},
+      favoriteFoods: [],
+      favoriteFoodIds: new Set(),
       isLoadingLogs: false,
       isLoadingGoals: false,
       isLoadingWeightLogs: false,
@@ -582,6 +588,39 @@ export const useDiaryStore = create<DiaryStore>()(
           await diaryService.upsertUserCustomPortion(userId, foodId, portionWeightG);
         } catch (err) {
           console.error('Error saving user custom portion:', err);
+        }
+      },
+
+      fetchFavoriteFoods: async (userId) => {
+        try {
+          const list = await diaryService.fetchFavoriteFoods(userId);
+          const ids = new Set(list.map((f) => f.id));
+          set({ favoriteFoods: list, favoriteFoodIds: ids });
+        } catch (err) {
+          console.error('Error fetching favorite foods:', err);
+        }
+      },
+
+      toggleFavoriteFood: async (userId, food) => {
+        try {
+          const isCurrentlyFavorite = get().favoriteFoodIds.has(food.id);
+          // Optimistic update
+          set((state) => {
+            const nextSet = new Set(state.favoriteFoodIds);
+            let nextList = [...state.favoriteFoods];
+            if (isCurrentlyFavorite) {
+              nextSet.delete(food.id);
+              nextList = nextList.filter((f) => f.id !== food.id);
+            } else {
+              nextSet.add(food.id);
+              nextList = [food, ...nextList];
+            }
+            return { favoriteFoods: nextList, favoriteFoodIds: nextSet };
+          });
+
+          await diaryService.toggleFavoriteFood(userId, food, isCurrentlyFavorite);
+        } catch (err) {
+          console.error('Error toggling favorite food:', err);
         }
       },
 

@@ -787,6 +787,79 @@ export const diaryService = {
   },
 
   /**
+   * Fetches favorite foods for a user
+   */
+  async fetchFavoriteFoods(userId: string): Promise<FoodItem[]> {
+    try {
+      if (!navigator.onLine) throw new Error('Offline');
+      const { data, error } = await supabase
+        .from('user_favorite_foods')
+        .select('food_id, food_data')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      const foods: FoodItem[] = (data || []).map((row: any) => row.food_data);
+
+      // Cache in IndexedDB
+      for (const food of foods) {
+        await db.favorites.put({
+          key: `${userId}_${food.id}`,
+          userId,
+          foodId: food.id,
+          foodJson: JSON.stringify(food),
+        });
+      }
+
+      return foods;
+    } catch (err) {
+      console.warn('fetchFavoriteFoods falling back to IndexedDB:', err);
+      const cached = await db.favorites.where('userId').equals(userId).toArray();
+      return cached.map((c) => JSON.parse(c.foodJson));
+    }
+  },
+
+  /**
+   * Toggles favorite state of a food item
+   */
+  async toggleFavoriteFood(userId: string, food: FoodItem, isCurrentlyFavorite: boolean): Promise<boolean> {
+    try {
+      const key = `${userId}_${food.id}`;
+      if (isCurrentlyFavorite) {
+        // Remove from favorite
+        if (navigator.onLine) {
+          await supabase
+            .from('user_favorite_foods')
+            .delete()
+            .eq('user_id', userId)
+            .eq('food_id', food.id);
+        }
+        await db.favorites.delete(key);
+      } else {
+        // Add to favorite
+        if (navigator.onLine) {
+          await supabase
+            .from('user_favorite_foods')
+            .upsert(
+              { user_id: userId, food_id: food.id, food_data: food },
+              { onConflict: 'user_id,food_id' }
+            );
+        }
+        await db.favorites.put({
+          key,
+          userId,
+          foodId: food.id,
+          foodJson: JSON.stringify(food),
+        });
+      }
+      return true;
+    } catch (err) {
+      console.warn('toggleFavoriteFood error fallback:', err);
+      return true;
+    }
+  },
+
+  /**
    * Fetches daily summaries of calorie and macro intake for a range of dates
    */
   async fetchDailySummariesRange(

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type FoodTab = 'recent' | 'frequent' | 'my_foods' | 'meals' | 'recipes';
+export type FoodTab = 'recent' | 'frequent' | 'favorites' | 'my_foods' | 'meals' | 'recipes';
 
 interface TabBarProps {
   activeTab: FoodTab;
@@ -11,6 +11,7 @@ export const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
   const tabs: { id: FoodTab; label: string }[] = [
     { id: 'recent', label: 'Recenti' },
     { id: 'frequent', label: 'Frequenti' },
+    { id: 'favorites', label: 'Preferiti' },
     { id: 'my_foods', label: 'I miei alimenti' },
     { id: 'meals', label: 'Pasti' },
     { id: 'recipes', label: 'Ricette' },
