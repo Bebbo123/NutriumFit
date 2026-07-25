@@ -14,6 +14,7 @@ import {
   Tag,
   Settings2,
   Star,
+  Pencil,
 } from 'lucide-react';
 import { useDiaryStore } from '../store/diaryStore';
 import { MOCK_FOOD_DATABASE } from '../data/mockFoods';
@@ -98,7 +99,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   const [rbIngredientQuantity, setRbIngredientQuantity] = useState<number>(100);
   const [rbSearchResults, setRbSearchResults] = useState<FoodItem[]>([]);
   const [rbSearching, setRbSearching] = useState(false);
-  const debouncedRbQuery = useDebounce(rbSearchQuery, 500);
+  const debouncedRbQuery = useDebounce(rbSearchQuery, 350);
 
   // Recipe selection for diary serving modal
   const [selectedRecipeForDiary, setSelectedRecipeForDiary] = useState<Recipe | null>(null);
@@ -106,6 +107,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
 
   // Custom food form states
   const [showCustomFoodModal, setShowCustomFoodModal] = useState(false);
+  const [editingCustomFood, setEditingCustomFood] = useState<FoodItem | null>(null);
   const [customFoodName, setCustomFoodName] = useState('');
   const [customFoodBrand, setCustomFoodBrand] = useState('');
   const [customFoodCalories, setCustomFoodCalories] = useState('');
@@ -131,7 +133,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Debounced search query
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
 
   const loadCustomFoods = useCallback(async () => {
     if (!user) return;
@@ -162,6 +164,8 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   // Fetch from OpenFoodFacts API and custom_foods when debounced query changes
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+
     const performSearch = async () => {
       if (!debouncedSearchQuery.trim()) {
         setApiFoods([]);
@@ -172,14 +176,16 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
       try {
         const [customResults, apiResults] = await Promise.all([
           user ? diaryService.searchCustomFoods(user.id, debouncedSearchQuery) : Promise.resolve([]),
-          searchAllFoods(debouncedSearchQuery)
+          searchAllFoods(debouncedSearchQuery, controller.signal)
         ]);
 
         if (active) {
           setApiFoods([...customResults, ...apiResults]);
         }
-      } catch (err) {
-        console.error('Error fetching foods:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('Error fetching foods:', err);
+        }
         if (active) {
           setApiFoods([]);
         }
@@ -193,12 +199,15 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     performSearch();
     return () => {
       active = false;
+      controller.abort();
     };
   }, [debouncedSearchQuery, user]);
 
   // Search inside Recipe Builder
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+
     const performRbSearch = async () => {
       if (!debouncedRbQuery.trim()) {
         setRbSearchResults([]);
@@ -209,7 +218,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
       try {
         const [customResults, apiResults] = await Promise.all([
           user ? diaryService.searchCustomFoods(user.id, debouncedRbQuery) : Promise.resolve([]),
-          searchAllFoods(debouncedRbQuery)
+          searchAllFoods(debouncedRbQuery, controller.signal)
         ]);
 
         if (active) {
@@ -217,8 +226,10 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
           const localMatch = MOCK_FOOD_DATABASE.filter(f => f.name.toLowerCase().includes(debouncedRbQuery.toLowerCase()));
           setRbSearchResults([...customResults, ...localMatch, ...apiResults]);
         }
-      } catch (err) {
-        console.error('Recipe builder search error:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('Recipe builder search error:', err);
+        }
       } finally {
         if (active) {
           setRbSearching(false);
@@ -228,6 +239,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     performRbSearch();
     return () => {
       active = false;
+      controller.abort();
     };
   }, [debouncedRbQuery, user]);
 
@@ -623,7 +635,30 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     };
   }, [showScannerModal]);
 
-  const handleCreateCustomFood = async (e: React.FormEvent) => {
+  const handleEditCustomFood = (food: FoodItem) => {
+    setEditingCustomFood(food);
+    setCustomFoodName(food.name);
+    setCustomFoodBrand(food.brand || '');
+    setCustomFoodCalories(food.calories.toString());
+    setCustomFoodCarbs(food.macros.carbs.toString());
+    setCustomFoodFat(food.macros.fat.toString());
+    setCustomFoodProtein(food.macros.protein.toString());
+    setCustomFoodError(null);
+    setShowCustomFoodModal(true);
+  };
+
+  const handleDeleteCustomFood = async (foodId: string) => {
+    if (!window.confirm('Eliminare questo alimento personalizzato?')) return;
+    try {
+      await diaryService.deleteCustomFood(foodId);
+      setCustomFoods((prev) => prev.filter((f) => f.id !== foodId));
+      showToast('Alimento personalizzato eliminato');
+    } catch (err: any) {
+      showToast(err.message || "Errore durante l'eliminazione", 'error');
+    }
+  };
+
+  const handleSaveCustomFood = async (e: React.FormEvent) => {
     e.preventDefault();
     setCustomFoodError(null);
 
@@ -648,26 +683,56 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
       const fat = parseFloat(customFoodFat) || 0;
       const protein = parseFloat(customFoodProtein) || 0;
 
-      const createdFood = await diaryService.createCustomFood(
-        user.id,
-        customFoodName,
-        customFoodBrand,
-        calories,
-        carbs,
-        fat,
-        protein
-      );
+      if (editingCustomFood) {
+        await diaryService.updateCustomFood(editingCustomFood.id, {
+          foodName: customFoodName,
+          brand: customFoodBrand,
+          calories,
+          carbs,
+          fat,
+          protein,
+        });
 
-      if (createdFood) {
-        setCustomFoods((prev) => [createdFood, ...prev]);
+        const updatedItem: FoodItem = {
+          ...editingCustomFood,
+          name: customFoodName,
+          brand: customFoodBrand || undefined,
+          calories,
+          macros: { carbs, fat, protein },
+        };
+
+        setCustomFoods((prev) => prev.map((f) => (f.id === editingCustomFood.id ? updatedItem : f)));
         setShowCustomFoodModal(false);
+        setEditingCustomFood(null);
         setCustomFoodName('');
         setCustomFoodBrand('');
         setCustomFoodCalories('');
         setCustomFoodCarbs('');
         setCustomFoodFat('');
         setCustomFoodProtein('');
-        showToast("Alimento personalizzato creato!");
+        showToast("Alimento personalizzato aggiornato!");
+      } else {
+        const createdFood = await diaryService.createCustomFood(
+          user.id,
+          customFoodName,
+          customFoodBrand,
+          calories,
+          carbs,
+          fat,
+          protein
+        );
+
+        if (createdFood) {
+          setCustomFoods((prev) => [createdFood, ...prev]);
+          setShowCustomFoodModal(false);
+          setCustomFoodName('');
+          setCustomFoodBrand('');
+          setCustomFoodCalories('');
+          setCustomFoodCarbs('');
+          setCustomFoodFat('');
+          setCustomFoodProtein('');
+          showToast("Alimento personalizzato creato!");
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -1074,8 +1139,34 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Action Buttons: Star Favorite & Quick Add */}
+                  {/* Action Buttons: Edit/Delete Custom Food, Star Favorite & Quick Add */}
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {food.id.startsWith('custom_') && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCustomFood(food);
+                          }}
+                          className="p-2.5 rounded-xl bg-slate-950 text-slate-400 hover:text-cyan-400 border border-slate-800/80 transition-all cursor-pointer"
+                          title="Modifica alimento personalizzato"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCustomFood(food.id);
+                          }}
+                          className="p-2.5 rounded-xl bg-slate-950 text-slate-400 hover:text-red-400 border border-slate-800/80 transition-all cursor-pointer"
+                          title="Elimina alimento personalizzato"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-400/80" />
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1511,7 +1602,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
 
       {/* Scanner modal */}
       {showScannerModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 pt-safe-modal">
           <div className="flex items-center justify-between z-10">
             <div>
               <h3 className="text-lg font-extrabold text-white">Scansione Codice a Barre</h3>
@@ -1575,11 +1666,13 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
         </div>
       )}
 
-      {/* Custom Food Creation Modal */}
+      {/* Custom Food Creation / Edit Modal */}
       {showCustomFoodModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-lg font-extrabold text-white mb-1">Crea Alimento Personalizzato</h3>
+            <h3 className="text-lg font-extrabold text-white mb-1">
+              {editingCustomFood ? 'Modifica Alimento Personalizzato' : 'Crea Alimento Personalizzato'}
+            </h3>
             <p className="text-xs text-slate-400 mb-4">Inserisci i valori nutrizionali per 100g o 100ml.</p>
 
             {customFoodError && (
@@ -1589,7 +1682,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleCreateCustomFood} className="space-y-4">
+            <form onSubmit={handleSaveCustomFood} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Nome alimento *
@@ -1684,7 +1777,10 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCustomFoodModal(false)}
+                  onClick={() => {
+                    setShowCustomFoodModal(false);
+                    setEditingCustomFood(null);
+                  }}
                   className="flex-1 py-3 rounded-2xl bg-slate-800 text-slate-350 font-semibold text-sm cursor-pointer"
                 >
                   Annulla
@@ -1697,7 +1793,7 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                   {customFoodSaving ? (
                     <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    'Salva e Continua'
+                    editingCustomFood ? 'Aggiorna' : 'Salva e Continua'
                   )}
                 </button>
               </div>

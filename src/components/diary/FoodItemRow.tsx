@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Tag } from 'lucide-react';
+import { Trash2, Tag, Star } from 'lucide-react';
 import type { LoggedFood } from '../../types/diary';
 import { HealthScoreBadge } from '../common/HealthScoreBadge';
 
@@ -7,9 +7,17 @@ interface FoodItemRowProps {
   food: LoggedFood;
   onRemove: (logId: string) => void;
   onEdit?: (food: LoggedFood) => void;
+  onToggleFavorite?: (food: LoggedFood) => void;
+  isFavorite?: boolean;
 }
 
-export const FoodItemRow: React.FC<FoodItemRowProps> = ({ food, onRemove, onEdit }) => {
+export const FoodItemRow: React.FC<FoodItemRowProps> = ({
+  food,
+  onRemove,
+  onEdit,
+  onToggleFavorite,
+  isFavorite = false,
+}) => {
   return (
     <div
       onClick={() => onEdit && onEdit(food)}
@@ -41,10 +49,29 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({ food, onRemove, onEdit
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-bold text-slate-200 font-mono">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-bold text-slate-200 font-mono mr-1">
           {food.calories} <span className="text-[10px] font-normal text-slate-400">kcal</span>
         </span>
+
+        {onToggleFavorite && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(food);
+            }}
+            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+              isFavorite
+                ? 'text-amber-400 hover:bg-amber-950/40'
+                : 'text-slate-500 hover:text-amber-400 hover:bg-slate-800 opacity-70 group-hover:opacity-100'
+            }`}
+            title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+          >
+            <Star className={`w-4 h-4 ${isFavorite ? 'fill-amber-400' : ''}`} />
+          </button>
+        )}
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -59,3 +86,4 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({ food, onRemove, onEdit
     </div>
   );
 };
+

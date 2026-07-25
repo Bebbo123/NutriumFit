@@ -80,35 +80,32 @@ export const diaryService = {
    * Updates user profile goals in public.profiles
    */
   async updateProfileGoals(userId: string, goals: Partial<DailyGoals>): Promise<boolean> {
-    try {
-      if (!navigator.onLine) throw new Error('Offline');
-      const updates: any = {};
-      if (goals.calories !== undefined) updates.daily_calorie_goal = goals.calories;
-      if (goals.carbs !== undefined) updates.carb_goal = goals.carbs;
-      if (goals.fat !== undefined) updates.fat_goal = goals.fat;
-      if (goals.protein !== undefined) updates.protein_goal = goals.protein;
-      if (goals.waterMl !== undefined) updates.water_goal_ml = goals.waterMl;
-      if (goals.steps !== undefined) updates.steps_goal = goals.steps;
-      if (goals.macroInputMode !== undefined) updates.macro_input_mode = goals.macroInputMode;
-      if (goals.currentWeight !== undefined) updates.current_weight = goals.currentWeight;
-      if (goals.targetWeight !== undefined) updates.target_weight = goals.targetWeight;
-      if (goals.weeklyGoal !== undefined) updates.weekly_goal = goals.weeklyGoal;
-      if (goals.activityLevel !== undefined) updates.activity_level = goals.activityLevel;
-      if (goals.age !== undefined) updates.age = goals.age;
-      if (goals.gender !== undefined) updates.gender = goals.gender;
-      if (goals.height !== undefined) updates.height = goals.height;
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.warn('updateProfileGoals falling back to offline:', err);
-      return true;
+    if (!navigator.onLine) {
+      throw new Error('Offline');
     }
+    const updates: any = {};
+    if (goals.calories !== undefined) updates.daily_calorie_goal = goals.calories;
+    if (goals.carbs !== undefined) updates.carb_goal = goals.carbs;
+    if (goals.fat !== undefined) updates.fat_goal = goals.fat;
+    if (goals.protein !== undefined) updates.protein_goal = goals.protein;
+    if (goals.waterMl !== undefined) updates.water_goal_ml = goals.waterMl;
+    if (goals.steps !== undefined) updates.steps_goal = goals.steps;
+    if (goals.macroInputMode !== undefined) updates.macro_input_mode = goals.macroInputMode;
+    if (goals.currentWeight !== undefined) updates.current_weight = goals.currentWeight;
+    if (goals.targetWeight !== undefined) updates.target_weight = goals.targetWeight;
+    if (goals.weeklyGoal !== undefined) updates.weekly_goal = goals.weeklyGoal;
+    if (goals.activityLevel !== undefined) updates.activity_level = goals.activityLevel;
+    if (goals.age !== undefined) updates.age = goals.age;
+    if (goals.gender !== undefined) updates.gender = goals.gender;
+    if (goals.height !== undefined) updates.height = goals.height;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId);
+
+    if (error) throw error;
+    return true;
   },
 
   /**
@@ -559,6 +556,58 @@ export const diaryService = {
       },
       isVerified: false,
     };
+  },
+
+  /**
+   * Updates an existing custom food in the database
+   */
+  async updateCustomFood(
+    customFoodId: string,
+    updates: {
+      foodName?: string;
+      brand?: string;
+      calories?: number;
+      carbs?: number;
+      fat?: number;
+      protein?: number;
+    }
+  ): Promise<boolean> {
+    const rawId = customFoodId.replace(/^custom_/, '');
+    const updatePayload: any = {};
+    if (updates.foodName !== undefined) updatePayload.food_name = updates.foodName;
+    if (updates.brand !== undefined) updatePayload.brand = updates.brand || null;
+    if (updates.calories !== undefined) updatePayload.calories = Math.round(updates.calories);
+    if (updates.carbs !== undefined) updatePayload.carbs = Math.round(updates.carbs * 10) / 10;
+    if (updates.fat !== undefined) updatePayload.fat = Math.round(updates.fat * 10) / 10;
+    if (updates.protein !== undefined) updatePayload.protein = Math.round(updates.protein * 10) / 10;
+
+    const { error } = await supabase
+      .from('custom_foods')
+      .update(updatePayload)
+      .eq('id', rawId);
+
+    if (error) {
+      console.error('Error updating custom food:', error);
+      throw error;
+    }
+    return true;
+  },
+
+  /**
+   * Deletes a custom food from the database
+   */
+  async deleteCustomFood(customFoodId: string): Promise<boolean> {
+    const rawId = customFoodId.replace(/^custom_/, '');
+    const { error } = await supabase
+      .from('custom_foods')
+      .delete()
+      .eq('id', rawId);
+
+    if (error) {
+      console.error('Error deleting custom food:', error);
+      throw error;
+    }
+    return true;
   },
 
   /**

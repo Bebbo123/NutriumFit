@@ -11,6 +11,8 @@ interface MealSectionProps {
   onEditFood?: (food: LoggedFood) => void;
   onAddFoodClick: (mealType: MealType) => void;
   onSaveMealAsGroup?: (mealType: MealType) => void;
+  onToggleFavorite?: (food: LoggedFood) => void;
+  favoriteFoodIds?: Set<string>;
 }
 
 const MEAL_ICONS = {
@@ -35,6 +37,8 @@ export const MealSection: React.FC<MealSectionProps> = ({
   onEditFood,
   onAddFoodClick,
   onSaveMealAsGroup,
+  onToggleFavorite,
+  favoriteFoodIds,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -103,9 +107,22 @@ export const MealSection: React.FC<MealSectionProps> = ({
               Nessun alimento registrato per {title.toLowerCase()} oggi.
             </div>
           ) : (
-            foods.map((food) => (
-              <FoodItemRow key={food.logId} food={food} onRemove={onRemoveFood} onEdit={onEditFood} />
-            ))
+            foods.map((food) => {
+              const isFav = favoriteFoodIds
+                ? favoriteFoodIds.has(food.name.toLowerCase().replace(/\s+/g, '_')) ||
+                  favoriteFoodIds.has(food.logId)
+                : false;
+              return (
+                <FoodItemRow
+                  key={food.logId}
+                  food={food}
+                  onRemove={onRemoveFood}
+                  onEdit={onEditFood}
+                  onToggleFavorite={onToggleFavorite}
+                  isFavorite={isFav}
+                />
+              );
+            })
           )}
 
           {/* Add Food Button & Save Meal option */}

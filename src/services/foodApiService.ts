@@ -78,7 +78,10 @@ const cleanBrandName = (rawBrand?: string): string => {
 /**
  * OpenFoodFacts search API handler.
  */
-export const searchOpenFoodFacts = async (query: string): Promise<FoodItem[]> => {
+/**
+ * OpenFoodFacts search API handler.
+ */
+export const searchOpenFoodFacts = async (query: string, signal?: AbortSignal): Promise<FoodItem[]> => {
   if (!query.trim()) return [];
 
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
@@ -87,6 +90,7 @@ export const searchOpenFoodFacts = async (query: string): Promise<FoodItem[]> =>
 
   try {
     const response = await fetch(url, {
+      signal,
       headers: {
         'User-Agent': 'NutriumFit - PWA - Version 1.0',
       },
@@ -167,7 +171,8 @@ export const searchOpenFoodFacts = async (query: string): Promise<FoodItem[]> =>
         barcode: product.code || undefined,
       };
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.name === 'AbortError') return [];
     console.error('Error searching OpenFoodFacts:', error);
     return [];
   }
@@ -176,7 +181,7 @@ export const searchOpenFoodFacts = async (query: string): Promise<FoodItem[]> =>
 /**
  * USDA FoodData Central API search for raw / unbranded fresh foods.
  */
-export const searchUsdaFoods = async (query: string): Promise<FoodItem[]> => {
+export const searchUsdaFoods = async (query: string, signal?: AbortSignal): Promise<FoodItem[]> => {
   if (!query.trim()) return [];
 
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query=${encodeURIComponent(
@@ -184,7 +189,7 @@ export const searchUsdaFoods = async (query: string): Promise<FoodItem[]> => {
   )}&pageSize=5`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (!response.ok) return [];
 
     const data = await response.json();
@@ -228,7 +233,8 @@ export const searchUsdaFoods = async (query: string): Promise<FoodItem[]> => {
         healthScore,
       };
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return [];
     console.error('USDA search failed:', err);
     return [];
   }
@@ -237,7 +243,7 @@ export const searchUsdaFoods = async (query: string): Promise<FoodItem[]> => {
 /**
  * Unified search combining Local Italian Fresh Staples, OpenFoodFacts, and USDA FoodData Central.
  */
-export const searchAllFoods = async (query: string): Promise<FoodItem[]> => {
+export const searchAllFoods = async (query: string, signal?: AbortSignal): Promise<FoodItem[]> => {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
@@ -254,8 +260,8 @@ export const searchAllFoods = async (query: string): Promise<FoodItem[]> => {
 
   // 2. Parallel network fetches for OFF and USDA
   const [offResults, usdaResults] = await Promise.all([
-    searchOpenFoodFacts(trimmed),
-    searchUsdaFoods(trimmed),
+    searchOpenFoodFacts(trimmed, signal),
+    searchUsdaFoods(trimmed, signal),
   ]);
 
   // Merge results: Local Italian fresh staples first, then OpenFoodFacts, then USDA

@@ -4,7 +4,7 @@ import { useDiaryStore } from '../store/diaryStore';
 import { useAuth } from '../context/AuthContext';
 import { MealSection } from '../components/diary/MealSection';
 import { EditFoodLogModal } from '../components/diary/EditFoodLogModal';
-import type { LoggedFood, MealType } from '../types/diary';
+import type { LoggedFood, MealType, FoodItem } from '../types/diary';
 
 interface DiaryPageProps {
   onNavigateToAddFood: (mealType?: MealType) => void;
@@ -23,6 +23,8 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
     isLoadingLogs,
     createSavedMeal,
     isOffline,
+    toggleFavoriteFood,
+    favoriteFoodIds,
   } = useDiaryStore();
 
   const [isSaveMealModalOpen, setIsSaveMealModalOpen] = useState(false);
@@ -38,6 +40,26 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
   const lunchFoods = dayLogs.filter((f) => f.mealType === 'Pranzo');
   const dinnerFoods = dayLogs.filter((f) => f.mealType === 'Cena');
   const snacksFoods = dayLogs.filter((f) => f.mealType === 'Spuntini');
+
+  const handleToggleFavorite = async (food: LoggedFood) => {
+    if (!user) return;
+    const foodItem: FoodItem = {
+      id: food.logId.startsWith('off_') || food.logId.startsWith('custom_') ? food.logId : food.name.toLowerCase().replace(/\s+/g, '_'),
+      name: food.name,
+      brand: food.brand,
+      servingSize: food.servingSizeDisplay || '1 porzione',
+      servingUnit: 'g',
+      servingAmount: 100,
+      calories: food.servings && food.servings > 0 ? Math.round(food.calories / food.servings) : food.calories,
+      macros: {
+        carbs: food.servings && food.servings > 0 ? Math.round((food.macros.carbs / food.servings) * 10) / 10 : food.macros.carbs,
+        fat: food.servings && food.servings > 0 ? Math.round((food.macros.fat / food.servings) * 10) / 10 : food.macros.fat,
+        protein: food.servings && food.servings > 0 ? Math.round((food.macros.protein / food.servings) * 10) / 10 : food.macros.protein,
+      },
+      healthScore: food.healthScore,
+    };
+    await toggleFavoriteFood(user.id, foodItem);
+  };
 
   // Date Navigation Helpers (Italian Localized)
   const formatDateLabel = (dateStr: string) => {
@@ -173,6 +195,8 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
+          onToggleFavorite={handleToggleFavorite}
+          favoriteFoodIds={favoriteFoodIds}
         />
 
         <MealSection
@@ -183,6 +207,8 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
+          onToggleFavorite={handleToggleFavorite}
+          favoriteFoodIds={favoriteFoodIds}
         />
 
         <MealSection
@@ -193,6 +219,8 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
+          onToggleFavorite={handleToggleFavorite}
+          favoriteFoodIds={favoriteFoodIds}
         />
 
         <MealSection
@@ -203,6 +231,8 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
+          onToggleFavorite={handleToggleFavorite}
+          favoriteFoodIds={favoriteFoodIds}
         />
       </div>
 

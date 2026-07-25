@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { X, Trash2, Save, Tag } from 'lucide-react';
-import type { LoggedFood, MealType } from '../../types/diary';
+import { X, Trash2, Save, Tag, Star } from 'lucide-react';
+import type { LoggedFood, MealType, FoodItem } from '../../types/diary';
 import { HealthScoreBadge } from '../common/HealthScoreBadge';
 import { MacroPreviewRings } from '../food/MacroPreviewRings';
 import { WheelDialPicker } from '../ui/WheelDialPicker';
 import { useDiaryStore } from '../../store/diaryStore';
+import { useAuth } from '../../context/AuthContext';
 
 interface EditFoodLogModalProps {
   foodLog: LoggedFood;
@@ -33,6 +34,34 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
   onSave,
   onDelete,
 }) => {
+  const { user } = useAuth();
+  const { selectedDate, goals, getTotalsForDate, toggleFavoriteFood, favoriteFoodIds } = useDiaryStore();
+
+  const isFavorite = favoriteFoodIds.has(
+    foodLog.logId.startsWith('off_') || foodLog.logId.startsWith('custom_')
+      ? foodLog.logId
+      : foodLog.name.toLowerCase().replace(/\s+/g, '_')
+  ) || favoriteFoodIds.has(foodLog.logId);
+
+  const handleToggleFavorite = async () => {
+    if (!user) return;
+    const foodItem: FoodItem = {
+      id: foodLog.logId.startsWith('off_') || foodLog.logId.startsWith('custom_') ? foodLog.logId : foodLog.name.toLowerCase().replace(/\s+/g, '_'),
+      name: foodLog.name,
+      brand: foodLog.brand,
+      servingSize: foodLog.servingSizeDisplay || '1 porzione',
+      servingUnit: 'g',
+      servingAmount: 100,
+      calories: foodLog.servings && foodLog.servings > 0 ? Math.round(foodLog.calories / foodLog.servings) : foodLog.calories,
+      macros: {
+        carbs: foodLog.servings && foodLog.servings > 0 ? Math.round((foodLog.macros.carbs / foodLog.servings) * 10) / 10 : foodLog.macros.carbs,
+        fat: foodLog.servings && foodLog.servings > 0 ? Math.round((foodLog.macros.fat / foodLog.servings) * 10) / 10 : foodLog.macros.fat,
+        protein: foodLog.servings && foodLog.servings > 0 ? Math.round((foodLog.macros.protein / foodLog.servings) * 10) / 10 : foodLog.macros.protein,
+      },
+      healthScore: foodLog.healthScore,
+    };
+    await toggleFavoriteFood(user.id, foodItem);
+  };
   const [selectedMeal, setSelectedMeal] = useState<MealType>(foodLog.mealType);
   const [foodName, setFoodName] = useState(foodLog.name);
   const [brand, setBrand] = useState(foodLog.brand || '');
@@ -134,7 +163,6 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
     }
   };
 
-  const { selectedDate, goals, getTotalsForDate } = useDiaryStore();
   const dayTotals = useMemo(() => getTotalsForDate(selectedDate), [selectedDate, getTotalsForDate]);
 
   return (
@@ -147,13 +175,27 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
             <h3 className="text-base font-extrabold text-white">Modifica Alimento</h3>
             <p className="text-xs text-slate-400">Aggiorna quantità, marca o pasto registrato</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleToggleFavorite}
+              className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                isFavorite
+                  ? 'bg-amber-950/80 text-amber-400 border border-amber-800/60 shadow-sm'
+                  : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/60'
+              }`}
+              title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+            >
+              <Star className={`w-4 h-4 ${isFavorite ? 'fill-amber-400' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Form Body */}
