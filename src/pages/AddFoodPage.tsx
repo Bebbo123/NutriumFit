@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  Tag,
 } from 'lucide-react';
 import { useDiaryStore } from '../store/diaryStore';
 import { MOCK_FOOD_DATABASE } from '../data/mockFoods';
@@ -23,6 +24,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { searchAllFoods, fetchFoodByBarcode } from '../services/foodApiService';
 import { diaryService } from '../services/diaryService';
 import { Html5Qrcode } from 'html5-qrcode';
+import { HealthScoreBadge } from '../components/common/HealthScoreBadge';
 
 interface AddFoodPageProps {
   initialMealType?: MealType;
@@ -975,6 +977,13 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                   >
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h3 className="text-sm font-bold text-slate-100 truncate">{food.name}</h3>
+                      {food.brand && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-cyan-400 font-semibold border border-slate-700/60 flex items-center gap-0.5">
+                          <Tag className="w-2.5 h-2.5 opacity-70" />
+                          {food.brand}
+                        </span>
+                      )}
+                      <HealthScoreBadge score={food.healthScore || 75} showBar={false} size="sm" />
                       {food.isVerified && (
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/60 font-semibold">
                           Verificato
@@ -988,7 +997,6 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                     </div>
 
                     <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                      {food.brand ? `${food.brand} • ` : ''}
                       {(food.id.startsWith('off_') || food.id.startsWith('custom_')) ? 'Valori per 100g' : food.servingSize}
                     </p>
 
@@ -1184,9 +1192,17 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 pb-24 sm:pb-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[82vh] flex flex-col mb-4 sm:mb-0">
             {/* Scrollable Form Content */}
-            <div className="overflow-y-auto pr-1 flex-1 space-y-4 mb-3">
-              <h3 className="text-lg font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
-              <p className="text-xs text-slate-400 mb-3">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
+            <div className="overflow-y-auto pr-1 flex-1 space-y-3 mb-3">
+              <div>
+                <h3 className="text-lg font-extrabold text-white mb-1">{selectedFoodForServing.name}</h3>
+                {selectedFoodForServing.brand && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-cyan-400 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800 mb-2">
+                    <Tag className="w-3 h-3" /> {selectedFoodForServing.brand}
+                  </span>
+                )}
+              </div>
+
+              <HealthScoreBadge score={selectedFoodForServing.healthScore || 75} size="md" />
 
               {/* Segmented Toggle Control */}
               <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-4">

@@ -20,6 +20,9 @@ export interface FoodItem {
   sodiumMg?: number;
   barcode?: string;
   isVerified?: boolean;
+  healthScore?: number;       // 0 - 100 percentage
+  nutriscoreGrade?: string;   // 'a' | 'b' | 'c' | 'd' | 'e'
+  novaGroup?: number;         // 1, 2, 3, 4
 }
 
 export interface LoggedFood {
@@ -36,6 +39,8 @@ export interface LoggedFood {
   grams?: number;
   portionMode?: 'grams' | 'portions';
   unitWeightGrams?: number;
+  healthScore?: number;       // 0 - 100 percentage
+  nutriscoreGrade?: string;
 }
 
 export interface DailyGoals {

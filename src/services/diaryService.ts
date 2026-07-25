@@ -186,10 +186,12 @@ export const diaryService = {
           logId: entry.id,
           foodId: entry.id,
           name: entry.food_name,
+          brand: entry.brand || undefined,
           servings: entry.servings || 1,
           servingSizeDisplay: entry.serving_size_display || (entry.grams ? `${entry.grams}g` : '1 porzione'),
           grams: entry.grams || null,
           unitWeightGrams: entry.unit_weight_grams || null,
+          healthScore: entry.health_score ? Number(entry.health_score) : undefined,
           calories: entry.calories,
           macros: {
             carbs: Number(entry.carbs),
@@ -219,8 +221,10 @@ export const diaryService = {
           logId: c.logId,
           foodId: c.logId,
           name: food.name,
+          brand: food.brand || undefined,
           servings: c.servings,
           servingSizeDisplay: food.servingSize || '1 porzione',
+          healthScore: food.healthScore || undefined,
           calories: food.calories * c.servings,
           macros: {
             carbs: food.macros.carbs * c.servings,
@@ -244,13 +248,34 @@ export const diaryService = {
     calories: number,
     carbs: number,
     fat: number,
-    protein: number
+    protein: number,
+    brand?: string,
+    healthScore?: number
   ): Promise<LoggedFood | null> {
     try {
       if (!navigator.onLine || dailyLogId.startsWith('offline_')) throw new Error('Offline');
-      const { data, error } = await supabase
+      
+      const payload: any = {
+        daily_log_id: dailyLogId,
+        meal_type: mealType,
+        food_name: foodName,
+        calories: Math.round(calories),
+        carbs: Math.round(carbs * 10) / 10,
+        fat: Math.round(fat * 10) / 10,
+        protein: Math.round(protein * 10) / 10,
+      };
+      if (brand) payload.brand = brand;
+      if (healthScore !== undefined) payload.health_score = healthScore;
+
+      let { data, error } = await supabase
         .from('food_entries')
-        .insert({
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        // Fallback retry without optional columns if not migrated yet
+        const basicPayload = {
           daily_log_id: dailyLogId,
           meal_type: mealType,
           food_name: foodName,
@@ -258,11 +283,18 @@ export const diaryService = {
           carbs: Math.round(carbs * 10) / 10,
           fat: Math.round(fat * 10) / 10,
           protein: Math.round(protein * 10) / 10,
-        })
-        .select()
-        .single();
+        };
+        const retryRes = await supabase
+          .from('food_entries')
+          .insert(basicPayload)
+          .select()
+          .single();
 
-      if (error) throw error;
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
+      if (error || !data) throw error;
 
       const entry = data as SupabaseFoodEntry;
       const dateObj = new Date(entry.created_at);
@@ -274,9 +306,11 @@ export const diaryService = {
         logId: entry.id,
         foodId: entry.id,
         name: entry.food_name,
+        brand,
         servings: 1,
         servingSizeDisplay: '1 porzione',
         calories: entry.calories,
+        healthScore,
         macros: {
           carbs: Number(entry.carbs),
           fat: Number(entry.fat),
@@ -301,9 +335,11 @@ export const diaryService = {
       
       const dummyFood = {
         name: foodName,
+        brand,
         calories,
         macros: { carbs, fat, protein },
         servingSize: '1 porzione',
+        healthScore,
       };
 
       await db.logs.add({
@@ -319,11 +355,13 @@ export const diaryService = {
         logId,
         foodId: logId,
         name: foodName,
+        brand,
         servings: 1,
         servingSizeDisplay: '1 porzione',
         calories,
         macros: { carbs, fat, protein },
         mealType,
+        healthScore,
         loggedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
     }
@@ -362,7 +400,9 @@ export const diaryService = {
     protein: number,
     servings?: number,
     servingSizeDisplay?: string,
-    grams?: number
+    grams?: number,
+    brand?: string,
+    healthScore?: number
   ): Promise<boolean> {
     try {
       if (navigator.onLine && !entryId.startsWith('offline_')) {
@@ -377,6 +417,8 @@ export const diaryService = {
         if (servings !== undefined) payload.servings = servings;
         if (servingSizeDisplay !== undefined) payload.serving_size_display = servingSizeDisplay;
         if (grams !== undefined) payload.grams = grams;
+        if (brand !== undefined) payload.brand = brand;
+        if (healthScore !== undefined) payload.health_score = healthScore;
 
         let { error } = await supabase
           .from('food_entries')
@@ -407,6 +449,8 @@ export const diaryService = {
         if (cached) {
           const food = JSON.parse(cached.foodItemJson);
           food.name = foodName;
+          if (brand !== undefined) food.brand = brand;
+          if (healthScore !== undefined) food.healthScore = healthScore;
           food.calories = Math.round(calories / (servings || 1));
           food.macros = {
             carbs: Math.round((carbs / (servings || 1)) * 10) / 10,

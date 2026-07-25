@@ -211,8 +211,8 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
         <EditFoodLogModal
           foodLog={editingFoodLog}
           onClose={() => setEditingFoodLog(null)}
-          onSave={async (logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay) => {
-            await updateFoodLog(selectedDate, logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay);
+          onSave={async (logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay, brand, healthScore) => {
+            await updateFoodLog(selectedDate, logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay, brand, healthScore);
           }}
           onDelete={async (logId) => {
             await removeFoodLog(selectedDate, logId);

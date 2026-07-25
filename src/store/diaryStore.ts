@@ -34,7 +34,7 @@ interface DiaryStore {
   fetchLogsForDate: (userId: string, date: string) => Promise<void>;
   fetchExerciseCalories: (userId: string, date: string) => Promise<void>;
   addFoodLog: (userId: string, date: string, food: FoodItem, mealType: MealType, servings?: number) => Promise<void>;
-  updateFoodLog: (date: string, logId: string, mealType: MealType, foodName: string, calories: number, carbs: number, fat: number, protein: number, servings?: number, servingSizeDisplay?: string) => Promise<void>;
+  updateFoodLog: (date: string, logId: string, mealType: MealType, foodName: string, calories: number, carbs: number, fat: number, protein: number, servings?: number, servingSizeDisplay?: string, brand?: string, healthScore?: number) => Promise<void>;
   removeFoodLog: (date: string, logId: string) => Promise<void>;
   updateWaterIntake: (userId: string, date: string, amountMl: number) => Promise<void>;
   incrementWaterIntake: (userId: string, date: string, amountMl: number) => Promise<void>;
@@ -271,10 +271,14 @@ export const useDiaryStore = create<DiaryStore>()(
               calories,
               carbs,
               fat,
-              protein
+              protein,
+              food.brand,
+              food.healthScore
             );
 
             if (newEntry) {
+              newEntry.brand = food.brand || newEntry.brand;
+              newEntry.healthScore = food.healthScore || newEntry.healthScore;
               newEntry.servings = servings;
               newEntry.calories = calories;
               newEntry.macros = { carbs, fat, protein };
@@ -336,10 +340,10 @@ export const useDiaryStore = create<DiaryStore>()(
         }
       },
 
-      updateFoodLog: async (date, logId, mealType, foodName, calories, carbs, fat, protein, servings = 1, servingSizeDisplay) => {
+      updateFoodLog: async (date, logId, mealType, foodName, calories, carbs, fat, protein, servings = 1, servingSizeDisplay, brand, healthScore) => {
         set({ isLoadingLogs: true });
         try {
-          const success = await diaryService.updateFoodEntry(logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay);
+          const success = await diaryService.updateFoodEntry(logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay, undefined, brand, healthScore);
           if (success) {
             set((state) => {
               const currentLogs = state.logs[date] || [];
@@ -349,6 +353,8 @@ export const useDiaryStore = create<DiaryStore>()(
                     ...log,
                     mealType,
                     name: foodName,
+                    brand: brand !== undefined ? brand : log.brand,
+                    healthScore: healthScore !== undefined ? healthScore : log.healthScore,
                     calories: Math.round(calories),
                     macros: {
                       carbs: Math.round(carbs * 10) / 10,

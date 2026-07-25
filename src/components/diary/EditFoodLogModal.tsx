@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { X, Trash2, Save } from 'lucide-react';
+import { X, Trash2, Save, Tag } from 'lucide-react';
 import type { LoggedFood, MealType } from '../../types/diary';
+import { HealthScoreBadge } from '../common/HealthScoreBadge';
 
 interface EditFoodLogModalProps {
   foodLog: LoggedFood;
@@ -14,7 +15,9 @@ interface EditFoodLogModalProps {
     fat: number,
     protein: number,
     servings?: number,
-    servingSizeDisplay?: string
+    servingSizeDisplay?: string,
+    brand?: string,
+    healthScore?: number
   ) => Promise<void>;
   onDelete: (logId: string) => Promise<void>;
 }
@@ -29,10 +32,11 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
 }) => {
   const [selectedMeal, setSelectedMeal] = useState<MealType>(foodLog.mealType);
   const [foodName, setFoodName] = useState(foodLog.name);
+  const [brand, setBrand] = useState(foodLog.brand || '');
   
   // Default mode estimation
   const [portionMode, setPortionMode] = useState<'grams' | 'portions'>('grams');
-  
+
   // Extract or estimate initial unit weight & grams
   const initialGrams = useMemo(() => {
     if (foodLog.grams && foodLog.grams > 0) return foodLog.grams;
@@ -101,7 +105,9 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
         calculated.fat,
         calculated.protein,
         servingsCount,
-        displayLabel
+        displayLabel,
+        brand.trim() || undefined,
+        foodLog.healthScore
       );
       onClose();
     } catch (err) {
@@ -133,7 +139,7 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
         <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3 shrink-0">
           <div>
             <h3 className="text-base font-extrabold text-white">Modifica Alimento</h3>
-            <p className="text-xs text-slate-400">Aggiorna quantità o pasto registrato</p>
+            <p className="text-xs text-slate-400">Aggiorna quantità, marca o pasto registrato</p>
           </div>
           <button
             type="button"
@@ -146,17 +152,34 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
 
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto pr-1 flex-1 space-y-3 mb-4">
-          {/* Food Name Input */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-              Nome Alimento
-            </label>
-            <input
-              type="text"
-              value={foodName}
-              onChange={(e) => setFoodName(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-sm text-slate-100 font-semibold focus:outline-none focus:border-cyan-500"
-            />
+          {/* Health Score Badge (if present) */}
+          <HealthScoreBadge score={foodLog.healthScore || 80} size="md" />
+
+          {/* Food Name & Brand Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Nome Alimento
+              </label>
+              <input
+                type="text"
+                value={foodName}
+                onChange={(e) => setFoodName(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-sm text-slate-100 font-semibold focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Tag className="w-3 h-3 text-cyan-400" /> Marca (opzionale)
+              </label>
+              <input
+                type="text"
+                placeholder="Es. Piacersi, Parmalat"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-sm text-slate-100 font-semibold focus:outline-none focus:border-cyan-500"
+              />
+            </div>
           </div>
 
           {/* Meal Selector */}
