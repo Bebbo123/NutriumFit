@@ -2,6 +2,21 @@ import { supabase } from '../utils/supabaseClient';
 import { diaryService } from './diaryService';
 import type { DailyGoals } from '../types/diary';
 
+const isPGRST204 = (error: any): boolean => {
+  if (!error) return false;
+  const code = String(error.code || '');
+  const message = String(error.message || '').toLowerCase();
+  const details = String(error.details || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    message.includes('pgrst204') ||
+    message.includes('schema cache') ||
+    message.includes('macro_input_mode') ||
+    message.includes('could not find the') ||
+    details.includes('schema cache')
+  );
+};
+
 async function executeResilientUpsert(
   table: string,
   initialPayload: Record<string, any>
@@ -9,7 +24,6 @@ async function executeResilientUpsert(
   const currentPayload = { ...initialPayload };
 
   for (let attempt = 0; attempt < 15; attempt++) {
-    // 1. Try UPSERT
     const res = await supabase.from(table).upsert(currentPayload, { onConflict: 'id' });
     if (!res.error) {
       console.log(`[executeResilientUpsert] Successfully saved to ${table} on attempt ${attempt + 1}:`, currentPayload);
@@ -19,7 +33,6 @@ async function executeResilientUpsert(
     const errText = `${res.error.message || ''} ${res.error.details || ''} ${res.error.hint || ''}`;
     const code = String(res.error.code || '');
 
-    // Match missing column from PostgREST PGRST204 or PostgreSQL schema error
     const match =
       errText.match(/Could not find the '([^']+)' column/i) ||
       errText.match(/column "([^"]+)" of relation/i) ||
@@ -35,7 +48,6 @@ async function executeResilientUpsert(
       }
     }
 
-    // 2. Try UPDATE as fallback
     const updateRes = await supabase.from(table).update(currentPayload).eq('id', currentPayload.id);
     if (!updateRes.error) {
       console.log(`[executeResilientUpsert] Successfully updated ${table}:`, currentPayload);
@@ -59,7 +71,6 @@ async function executeResilientUpsert(
       }
     }
 
-    // Return non-column error (e.g. table missing or network issue)
     return { success: false, error: res.error || updateRes.error };
   }
 
@@ -89,69 +100,131 @@ export const profileService = {
     const activeUserId = authData.user.id || userId;
     const nowIso = new Date().toISOString();
 
-    const rawPayload: Record<string, any> = {
+    // 1. CLEAN UNIFIED PRIMARY PAYLOAD (Standard normalized target_* column names ONLY - NO alias keys)
+    const primaryPayload: Record<string, any> = {
       id: activeUserId,
       updated_at: nowIso,
     };
 
-    if (goals.calories !== undefined) {
-      rawPayload.target_calories = goals.calories;
-      rawPayload.daily_calorie_goal = goals.calories;
-      rawPayload.calories = goals.calories;
-    }
-    if (goals.carbs !== undefined) {
-      rawPayload.target_carbs_g = goals.carbs;
-      rawPayload.carb_goal = goals.carbs;
-      rawPayload.carbs = goals.carbs;
-    }
-    if (goals.fat !== undefined) {
-      rawPayload.target_fat_g = goals.fat;
-      rawPayload.fat_goal = goals.fat;
-      rawPayload.fat = goals.fat;
-    }
-    if (goals.protein !== undefined) {
-      rawPayload.target_protein_g = goals.protein;
-      rawPayload.protein_goal = goals.protein;
-      rawPayload.protein = goals.protein;
-    }
-    if (goals.waterMl !== undefined) {
-      rawPayload.target_water_ml = goals.waterMl;
-      rawPayload.water_goal_ml = goals.waterMl;
-    }
-    if (goals.steps !== undefined) {
-      rawPayload.target_steps = goals.steps;
-      rawPayload.steps_goal = goals.steps;
-    }
-    if (goals.macroInputMode !== undefined) rawPayload.macro_input_mode = goals.macroInputMode;
-    if (goals.currentWeight !== undefined) rawPayload.current_weight = goals.currentWeight;
-    if (goals.targetWeight !== undefined) rawPayload.target_weight = goals.targetWeight;
-    if (goals.weeklyGoal !== undefined) rawPayload.weekly_goal = goals.weeklyGoal;
-    if (goals.activityLevel !== undefined) rawPayload.activity_level = goals.activityLevel;
-    if (goals.age !== undefined) rawPayload.age = goals.age;
-    if (goals.gender !== undefined) rawPayload.gender = goals.gender;
-    if (goals.height !== undefined) rawPayload.height = goals.height;
+    if (goals.calories !== undefined) primaryPayload.target_calories = goals.calories;
+    if (goals.carbs !== undefined) primaryPayload.target_carbs_g = goals.carbs;
+    if (goals.fat !== undefined) primaryPayload.target_fat_g = goals.fat;
+    if (goals.protein !== undefined) primaryPayload.target_protein_g = goals.protein;
+    if (goals.waterMl !== undefined) primaryPayload.target_water_ml = goals.waterMl;
+    if (goals.steps !== undefined) primaryPayload.target_steps = goals.steps;
+    if (goals.macroInputMode !== undefined) primaryPayload.macro_input_mode = goals.macroInputMode;
+
+    if (goals.currentWeight !== undefined) primaryPayload.current_weight = goals.currentWeight;
+    if (goals.targetWeight !== undefined) primaryPayload.target_weight = goals.targetWeight;
+    if (goals.weeklyGoal !== undefined) primaryPayload.weekly_goal = goals.weeklyGoal;
+    if (goals.activityLevel !== undefined) primaryPayload.activity_level = goals.activityLevel;
+    if (goals.age !== undefined) primaryPayload.age = goals.age;
+    if (goals.gender !== undefined) primaryPayload.gender = goals.gender;
+    if (goals.height !== undefined) primaryPayload.height = goals.height;
 
     // Clean undefined values
-    Object.keys(rawPayload).forEach((k) => rawPayload[k] === undefined && delete rawPayload[k]);
+    Object.keys(primaryPayload).forEach((k) => primaryPayload[k] === undefined && delete primaryPayload[k]);
 
-    // Attempt 1: Try user_profiles table first with self-healing column stripper
-    console.log('[updateUserProfileGoals] Attempting resilient save on user_profiles...');
-    const userProfilesResult = await executeResilientUpsert('user_profiles', rawPayload);
-    if (userProfilesResult.success) {
-      console.log('[updateUserProfileGoals] Successfully saved goals to user_profiles table!');
+    console.log('[updateUserProfileGoals] Step 1: Trying primary normalized payload on user_profiles:', primaryPayload);
+
+    // --- STEP 1: Primary UPSERT attempt on user_profiles with target_* keys ---
+    let res = await supabase.from('user_profiles').upsert(primaryPayload, { onConflict: 'id' });
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Primary UPSERT on user_profiles succeeded!');
       return true;
     }
 
-    // Attempt 2: Try profiles table with self-healing column stripper
-    console.log('[updateUserProfileGoals] Failover: Attempting resilient save on profiles...');
-    const profilesResult = await executeResilientUpsert('profiles', rawPayload);
-    if (profilesResult.success) {
-      console.log('[updateUserProfileGoals] Successfully saved goals to profiles table!');
+    let lastError = res.error;
+    console.warn('[updateUserProfileGoals] Step 1 failed:', lastError);
+
+    // Retry primary payload on user_profiles without macro_input_mode if PGRST204
+    if (isPGRST204(lastError) && 'macro_input_mode' in primaryPayload) {
+      const cleanPrimary = { ...primaryPayload };
+      delete cleanPrimary.macro_input_mode;
+      console.log('[updateUserProfileGoals] Step 1B: Retrying primary payload without macro_input_mode on user_profiles:', cleanPrimary);
+      res = await supabase.from('user_profiles').upsert(cleanPrimary, { onConflict: 'id' });
+      if (!res.error) {
+        console.log('[updateUserProfileGoals] Clean primary UPSERT on user_profiles succeeded!');
+        return true;
+      }
+      lastError = res.error;
+    }
+
+    // Try UPDATE on user_profiles with primary payload
+    res = await supabase.from('user_profiles').update(primaryPayload).eq('id', activeUserId);
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Primary UPDATE on user_profiles succeeded!');
       return true;
     }
 
-    const lastError = userProfilesResult.error || profilesResult.error;
-    console.error('CRITICAL: All resilient saving attempts failed:', lastError);
+    // --- STEP 2: Secondary Fallback Retry Strategy using alternative alias keys (*_goal) on profiles ---
+    const fallbackAliasPayload: Record<string, any> = {
+      id: activeUserId,
+      updated_at: nowIso,
+    };
+
+    if (goals.calories !== undefined) fallbackAliasPayload.daily_calorie_goal = goals.calories;
+    if (goals.carbs !== undefined) fallbackAliasPayload.carb_goal = goals.carbs;
+    if (goals.fat !== undefined) fallbackAliasPayload.fat_goal = goals.fat;
+    if (goals.protein !== undefined) fallbackAliasPayload.protein_goal = goals.protein;
+    if (goals.waterMl !== undefined) fallbackAliasPayload.water_goal_ml = goals.waterMl;
+    if (goals.steps !== undefined) fallbackAliasPayload.steps_goal = goals.steps;
+    if (goals.macroInputMode !== undefined) fallbackAliasPayload.macro_input_mode = goals.macroInputMode;
+
+    if (goals.currentWeight !== undefined) fallbackAliasPayload.current_weight = goals.currentWeight;
+    if (goals.targetWeight !== undefined) fallbackAliasPayload.target_weight = goals.targetWeight;
+    if (goals.weeklyGoal !== undefined) fallbackAliasPayload.weekly_goal = goals.weeklyGoal;
+    if (goals.activityLevel !== undefined) fallbackAliasPayload.activity_level = goals.activityLevel;
+    if (goals.age !== undefined) fallbackAliasPayload.age = goals.age;
+    if (goals.gender !== undefined) fallbackAliasPayload.gender = goals.gender;
+    if (goals.height !== undefined) fallbackAliasPayload.height = goals.height;
+
+    Object.keys(fallbackAliasPayload).forEach((k) => fallbackAliasPayload[k] === undefined && delete fallbackAliasPayload[k]);
+
+    console.log('[updateUserProfileGoals] Step 2: Fallback retry with alias keys on profiles:', fallbackAliasPayload);
+
+    res = await supabase.from('profiles').upsert(fallbackAliasPayload, { onConflict: 'id' });
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Fallback alias UPSERT on profiles succeeded!');
+      return true;
+    }
+    lastError = res.error;
+
+    if (isPGRST204(lastError) && 'macro_input_mode' in fallbackAliasPayload) {
+      const cleanAlias = { ...fallbackAliasPayload };
+      delete cleanAlias.macro_input_mode;
+      console.log('[updateUserProfileGoals] Step 2B: Retrying alias payload without macro_input_mode on profiles:', cleanAlias);
+      res = await supabase.from('profiles').upsert(cleanAlias, { onConflict: 'id' });
+      if (!res.error) {
+        console.log('[updateUserProfileGoals] Clean alias UPSERT on profiles succeeded!');
+        return true;
+      }
+      lastError = res.error;
+    }
+
+    res = await supabase.from('profiles').update(fallbackAliasPayload).eq('id', activeUserId);
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Fallback alias UPDATE on profiles succeeded!');
+      return true;
+    }
+
+    // --- STEP 3: Self-Healing dynamic column stripper fallback ---
+    console.log('[updateUserProfileGoals] Step 3: Self-healing resilient attempt on user_profiles...');
+    const userProfResilient = await executeResilientUpsert('user_profiles', primaryPayload);
+    if (userProfResilient.success) {
+      console.log('[updateUserProfileGoals] Self-healing UPSERT on user_profiles succeeded!');
+      return true;
+    }
+
+    console.log('[updateUserProfileGoals] Step 3B: Self-healing resilient attempt on profiles...');
+    const profResilient = await executeResilientUpsert('profiles', fallbackAliasPayload);
+    if (profResilient.success) {
+      console.log('[updateUserProfileGoals] Self-healing UPSERT on profiles succeeded!');
+      return true;
+    }
+
+    lastError = userProfResilient.error || profResilient.error || lastError;
+    console.error('CRITICAL: All saving strategies failed for user profile goals:', lastError);
 
     const errorMsg = lastError?.message || 'Errore durante la sincronizzazione degli obiettivi su Supabase';
     const errObj: any = new Error(errorMsg);
