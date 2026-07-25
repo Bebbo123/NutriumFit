@@ -1181,9 +1181,10 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
 
       {/* Selected Food Servings adjustment modal popup with Dual Selector */}
       {selectedFoodForServing && (
-        <div className="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[85vh] flex flex-col">
-            <div className="overflow-y-auto pr-1 flex-1 space-y-4 pb-28">
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 pb-24 sm:pb-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[82vh] flex flex-col mb-4 sm:mb-0">
+            {/* Scrollable Form Content */}
+            <div className="overflow-y-auto pr-1 flex-1 space-y-4 mb-3">
               <h3 className="text-lg font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
               <p className="text-xs text-slate-400 mb-3">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
 
@@ -1316,23 +1317,24 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                   </div>
                 )}
               </div>
+            </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedFoodForServing(null)}
-                  className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmServingAdd}
-                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
-                >
-                  Aggiungi a {selectedMeal}
-                </button>
-              </div>
+            {/* Fixed Action Buttons at bottom of card */}
+            <div className="flex gap-2 pt-2 border-t border-slate-800/60 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedFoodForServing(null)}
+                className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmServingAdd}
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
+              >
+                Aggiungi a {selectedMeal}
+              </button>
             </div>
           </div>
         </div>

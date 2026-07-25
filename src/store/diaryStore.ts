@@ -210,10 +210,15 @@ export const useDiaryStore = create<DiaryStore>()(
           if (navigator.onLine && dailyLog && !dailyLog.id.startsWith('offline_')) {
             await db.logs.where({ userId, date }).delete();
             for (const entry of entries) {
+              const sCount = entry.servings || 1;
               const mockFoodItem = {
                 name: entry.name,
-                calories: entry.calories,
-                macros: entry.macros,
+                calories: Math.round(entry.calories / sCount),
+                macros: {
+                  carbs: Math.round((entry.macros.carbs / sCount) * 10) / 10,
+                  fat: Math.round((entry.macros.fat / sCount) * 10) / 10,
+                  protein: Math.round((entry.macros.protein / sCount) * 10) / 10,
+                },
                 servingSize: entry.servingSizeDisplay || '1 porzione',
               };
               await db.logs.put({
@@ -222,7 +227,7 @@ export const useDiaryStore = create<DiaryStore>()(
                 date,
                 foodItemJson: JSON.stringify(mockFoodItem),
                 mealType: entry.mealType,
-                servings: entry.servings || 1,
+                servings: sCount,
               });
             }
           }
@@ -334,7 +339,7 @@ export const useDiaryStore = create<DiaryStore>()(
       updateFoodLog: async (date, logId, mealType, foodName, calories, carbs, fat, protein, servings = 1, servingSizeDisplay) => {
         set({ isLoadingLogs: true });
         try {
-          const success = await diaryService.updateFoodEntry(logId, mealType, foodName, calories, carbs, fat, protein);
+          const success = await diaryService.updateFoodEntry(logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay);
           if (success) {
             set((state) => {
               const currentLogs = state.logs[date] || [];

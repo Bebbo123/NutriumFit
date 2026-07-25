@@ -176,7 +176,7 @@ export const diaryService = {
 
       if (error) throw error;
 
-      return (data as SupabaseFoodEntry[]).map((entry) => {
+      return (data as SupabaseFoodEntry[]).map((entry: any) => {
         const dateObj = new Date(entry.created_at);
         const timeStr = isNaN(dateObj.getTime())
           ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -186,8 +186,10 @@ export const diaryService = {
           logId: entry.id,
           foodId: entry.id,
           name: entry.food_name,
-          servings: 1,
-          servingSizeDisplay: '1 porzione',
+          servings: entry.servings || 1,
+          servingSizeDisplay: entry.serving_size_display || (entry.grams ? `${entry.grams}g` : '1 porzione'),
+          grams: entry.grams || null,
+          unitWeightGrams: entry.unit_weight_grams || null,
           calories: entry.calories,
           macros: {
             carbs: Number(entry.carbs),
@@ -357,41 +359,75 @@ export const diaryService = {
     calories: number,
     carbs: number,
     fat: number,
-    protein: number
+    protein: number,
+    servings?: number,
+    servingSizeDisplay?: string,
+    grams?: number
   ): Promise<boolean> {
     try {
-      if (!navigator.onLine || entryId.startsWith('offline_')) throw new Error('Offline');
-      const { error } = await supabase
-        .from('food_entries')
-        .update({
+      if (navigator.onLine && !entryId.startsWith('offline_')) {
+        const payload: any = {
           meal_type: mealType,
           food_name: foodName,
           calories: Math.round(calories),
           carbs: Math.round(carbs * 10) / 10,
           fat: Math.round(fat * 10) / 10,
           protein: Math.round(protein * 10) / 10,
-        })
-        .eq('id', entryId);
+        };
+        if (servings !== undefined) payload.servings = servings;
+        if (servingSizeDisplay !== undefined) payload.serving_size_display = servingSizeDisplay;
+        if (grams !== undefined) payload.grams = grams;
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.warn('updateFoodEntry falling back to IndexedDB/local state:', err);
+        let { error } = await supabase
+          .from('food_entries')
+          .update(payload)
+          .eq('id', entryId);
+
+        if (error) {
+          const basicPayload = {
+            meal_type: mealType,
+            food_name: foodName,
+            calories: Math.round(calories),
+            carbs: Math.round(carbs * 10) / 10,
+            fat: Math.round(fat * 10) / 10,
+            protein: Math.round(protein * 10) / 10,
+          };
+          const { error: retryError } = await supabase
+            .from('food_entries')
+            .update(basicPayload)
+            .eq('id', entryId);
+
+          if (retryError) console.warn('Supabase update retry error:', retryError);
+        }
+      }
+
+      // ALWAYS update local IndexedDB cache as well!
       try {
         const cached = await db.logs.get(entryId);
         if (cached) {
           const food = JSON.parse(cached.foodItemJson);
           food.name = foodName;
-          food.calories = calories;
-          food.macros = { carbs, fat, protein };
-          await db.logs.update(entryId, {
+          food.calories = Math.round(calories / (servings || 1));
+          food.macros = {
+            carbs: Math.round((carbs / (servings || 1)) * 10) / 10,
+            fat: Math.round((fat / (servings || 1)) * 10) / 10,
+            protein: Math.round((protein / (servings || 1)) * 10) / 10,
+          };
+          food.servingSize = servingSizeDisplay || food.servingSize;
+          await db.logs.put({
+            ...cached,
             mealType,
+            servings: servings || cached.servings || 1,
             foodItemJson: JSON.stringify(food),
           });
         }
       } catch (e) {
         console.warn('IndexedDB update failed', e);
       }
+
+      return true;
+    } catch (err) {
+      console.warn('updateFoodEntry falling back to local state:', err);
       return true;
     }
   },
