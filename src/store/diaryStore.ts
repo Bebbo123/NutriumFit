@@ -34,6 +34,7 @@ interface DiaryStore {
   fetchLogsForDate: (userId: string, date: string) => Promise<void>;
   fetchExerciseCalories: (userId: string, date: string) => Promise<void>;
   addFoodLog: (userId: string, date: string, food: FoodItem, mealType: MealType, servings?: number) => Promise<void>;
+  updateFoodLog: (date: string, logId: string, mealType: MealType, foodName: string, calories: number, carbs: number, fat: number, protein: number, servings?: number, servingSizeDisplay?: string) => Promise<void>;
   removeFoodLog: (date: string, logId: string) => Promise<void>;
   updateWaterIntake: (userId: string, date: string, amountMl: number) => Promise<void>;
   incrementWaterIntake: (userId: string, date: string, amountMl: number) => Promise<void>;
@@ -325,6 +326,46 @@ export const useDiaryStore = create<DiaryStore>()(
           }
         } catch (err) {
           console.error('Error in removeFoodLog store action:', err);
+        } finally {
+          set({ isLoadingLogs: false });
+        }
+      },
+
+      updateFoodLog: async (date, logId, mealType, foodName, calories, carbs, fat, protein, servings = 1, servingSizeDisplay) => {
+        set({ isLoadingLogs: true });
+        try {
+          const success = await diaryService.updateFoodEntry(logId, mealType, foodName, calories, carbs, fat, protein);
+          if (success) {
+            set((state) => {
+              const currentLogs = state.logs[date] || [];
+              const updatedLogs = currentLogs.map((log) => {
+                if (log.logId === logId) {
+                  return {
+                    ...log,
+                    mealType,
+                    name: foodName,
+                    calories: Math.round(calories),
+                    macros: {
+                      carbs: Math.round(carbs * 10) / 10,
+                      fat: Math.round(fat * 10) / 10,
+                      protein: Math.round(protein * 10) / 10,
+                    },
+                    servings,
+                    servingSizeDisplay: servingSizeDisplay || log.servingSizeDisplay,
+                  };
+                }
+                return log;
+              });
+              return {
+                logs: {
+                  ...state.logs,
+                  [date]: updatedLogs,
+                },
+              };
+            });
+          }
+        } catch (err) {
+          console.error('Error in updateFoodLog store action:', err);
         } finally {
           set({ isLoadingLogs: false });
         }

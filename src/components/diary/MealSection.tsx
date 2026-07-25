@@ -8,6 +8,7 @@ interface MealSectionProps {
   mealType: MealType;
   foods: LoggedFood[];
   onRemoveFood: (logId: string) => void;
+  onEditFood?: (food: LoggedFood) => void;
   onAddFoodClick: (mealType: MealType) => void;
   onSaveMealAsGroup?: (mealType: MealType) => void;
 }
@@ -31,6 +32,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
   mealType,
   foods,
   onRemoveFood,
+  onEditFood,
   onAddFoodClick,
   onSaveMealAsGroup,
 }) => {
@@ -102,7 +104,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
             </div>
           ) : (
             foods.map((food) => (
-              <FoodItemRow key={food.logId} food={food} onRemove={onRemoveFood} />
+              <FoodItemRow key={food.logId} food={food} onRemove={onRemoveFood} onEdit={onEditFood} />
             ))
           )}
 

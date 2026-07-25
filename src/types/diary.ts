@@ -33,6 +33,9 @@ export interface LoggedFood {
   macros: Macros;
   mealType: MealType;
   loggedAt: string; // ISO string or time string
+  grams?: number;
+  portionMode?: 'grams' | 'portions';
+  unitWeightGrams?: number;
 }
 
 export interface DailyGoals {

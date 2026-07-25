@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabaseClient';
-import type { Exercise, Routine, RoutineExercise, PreviousSetPerformance, ExercisePR, ExerciseHistoryPoint, LastWeekMax, RoutineLastPerformed, WorkoutLogWithSets } from '../types/workout';
+import type { Exercise, Routine, RoutineExercise, PreviousSetPerformance, ExercisePR, ExerciseHistoryPoint, LastWeekMax, RoutineLastPerformed, WorkoutLogWithSets, MuscleGroup, Equipment } from '../types/workout';
 
 export const workoutService = {
   /**
@@ -7,7 +7,6 @@ export const workoutService = {
    */
   async fetchExercises(userId: string): Promise<Exercise[]> {
     if (!navigator.onLine) {
-       // fallback to indexedDB if implemented, else return empty
        return [];
     }
     const { data, error } = await supabase
@@ -21,6 +20,43 @@ export const workoutService = {
       return [];
     }
     return data as Exercise[];
+  },
+
+  /**
+   * Creates a new custom exercise.
+   */
+  async createCustomExercise(
+    userId: string,
+    name: string,
+    muscleGroup: MuscleGroup,
+    equipment: Equipment
+  ): Promise<Exercise | null> {
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .insert({
+          user_id: userId,
+          name,
+          muscle_group: muscleGroup,
+          equipment,
+          is_custom: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Exercise;
+    } catch (err) {
+      console.error('Error creating custom exercise:', err);
+      return {
+        id: `custom_ex_${Date.now()}`,
+        name,
+        muscle_group: muscleGroup,
+        equipment,
+        is_custom: true,
+        user_id: userId,
+      };
+    }
   },
 
   /**
@@ -90,17 +126,22 @@ export const workoutService = {
       const caloriesBurned = Math.max(0, minutes * 6);
 
       // 1. Insert Workout Log
+      const logPayload: any = {
+        user_id: userId,
+        title: workout.title || 'Allenamento Rapido',
+        duration_seconds: durationSeconds,
+        total_volume: totalVolume,
+        calories_burned: caloriesBurned,
+        started_at: workout.startedAt,
+        completed_at: new Date().toISOString()
+      };
+      if (workout.notes) {
+        logPayload.notes = workout.notes;
+      }
+
       const { data: logData, error: logError } = await supabase
         .from('workout_logs')
-        .insert({
-          user_id: userId,
-          title: workout.title || 'Allenamento Rapido',
-          duration_seconds: durationSeconds,
-          total_volume: totalVolume,
-          calories_burned: caloriesBurned,
-          started_at: workout.startedAt,
-          completed_at: new Date().toISOString()
-        })
+        .insert(logPayload)
         .select()
         .single();
         
@@ -114,7 +155,7 @@ export const workoutService = {
          ex.sets.forEach((set: any) => {
            // only save completed sets or sets with data
            if (set.is_completed || (set.weight && set.reps)) {
-             setsToInsert.push({
+             const setObj: any = {
                workout_log_id: logId,
                exercise_id: ex.exercise.id,
                set_number: set.set_number,
@@ -122,7 +163,11 @@ export const workoutService = {
                reps: set.reps,
                set_type: set.set_type,
                is_completed: set.is_completed
-             });
+             };
+             if (set.notes || ex.notes) {
+               setObj.notes = set.notes || ex.notes;
+             }
+             setsToInsert.push(setObj);
            }
          });
       });
@@ -231,7 +276,7 @@ export const workoutService = {
   async updateRoutine(
     routineId: string, 
     title: string, 
-    exercises: { exercise_id: string; target_sets: number; target_reps: string }[]
+    exercises: { exercise_id: string; target_sets: number; target_reps: string; notes?: string | null }[]
   ): Promise<boolean> {
     if (!navigator.onLine) return false;
     try {
@@ -255,7 +300,8 @@ export const workoutService = {
         exercise_id: ex.exercise_id,
         order_index: index,
         target_sets: ex.target_sets,
-        target_reps: ex.target_reps
+        target_reps: ex.target_reps,
+        notes: ex.notes || null,
       }));
 
       const { error: insertError } = await supabase

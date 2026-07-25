@@ -3,7 +3,8 @@ import { Calendar, ChevronLeft, ChevronRight, PieChart, RefreshCw } from 'lucide
 import { useDiaryStore } from '../store/diaryStore';
 import { useAuth } from '../context/AuthContext';
 import { MealSection } from '../components/diary/MealSection';
-import type { MealType } from '../types/diary';
+import { EditFoodLogModal } from '../components/diary/EditFoodLogModal';
+import type { LoggedFood, MealType } from '../types/diary';
 
 interface DiaryPageProps {
   onNavigateToAddFood: (mealType?: MealType) => void;
@@ -16,6 +17,7 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
     setSelectedDate,
     logs,
     removeFoodLog,
+    updateFoodLog,
     getTotalsForDate,
     goals,
     isLoadingLogs,
@@ -26,6 +28,7 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
   const [isSaveMealModalOpen, setIsSaveMealModalOpen] = useState(false);
   const [mealNameToSave, setMealNameToSave] = useState('');
   const [targetMealTypeToSave, setTargetMealTypeToSave] = useState<MealType | null>(null);
+  const [editingFoodLog, setEditingFoodLog] = useState<LoggedFood | null>(null);
 
   const dayLogs = logs[selectedDate] || [];
   const totals = getTotalsForDate(selectedDate);
@@ -167,6 +170,7 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           mealType="Colazione"
           foods={breakfastFoods}
           onRemoveFood={(logId) => removeFoodLog(selectedDate, logId)}
+          onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
         />
@@ -176,6 +180,7 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           mealType="Pranzo"
           foods={lunchFoods}
           onRemoveFood={(logId) => removeFoodLog(selectedDate, logId)}
+          onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
         />
@@ -185,6 +190,7 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           mealType="Cena"
           foods={dinnerFoods}
           onRemoveFood={(logId) => removeFoodLog(selectedDate, logId)}
+          onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
         />
@@ -194,10 +200,25 @@ export const DiaryPage: React.FC<DiaryPageProps> = ({ onNavigateToAddFood }) => 
           mealType="Spuntini"
           foods={snacksFoods}
           onRemoveFood={(logId) => removeFoodLog(selectedDate, logId)}
+          onEditFood={(food) => setEditingFoodLog(food)}
           onAddFoodClick={(meal) => onNavigateToAddFood(meal)}
           onSaveMealAsGroup={handleTriggerSaveMeal}
         />
       </div>
+
+      {/* Edit Food Log Modal */}
+      {editingFoodLog && (
+        <EditFoodLogModal
+          foodLog={editingFoodLog}
+          onClose={() => setEditingFoodLog(null)}
+          onSave={async (logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay) => {
+            await updateFoodLog(selectedDate, logId, mealType, foodName, calories, carbs, fat, protein, servings, servingSizeDisplay);
+          }}
+          onDelete={async (logId) => {
+            await removeFoodLog(selectedDate, logId);
+          }}
+        />
+      )}
 
       {/* Save Meal Dialog Modal */}
       {isSaveMealModalOpen && (

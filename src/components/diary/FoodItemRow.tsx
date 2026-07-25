@@ -5,14 +5,20 @@ import type { LoggedFood } from '../../types/diary';
 interface FoodItemRowProps {
   food: LoggedFood;
   onRemove: (logId: string) => void;
+  onEdit?: (food: LoggedFood) => void;
 }
 
-export const FoodItemRow: React.FC<FoodItemRowProps> = ({ food, onRemove }) => {
+export const FoodItemRow: React.FC<FoodItemRowProps> = ({ food, onRemove, onEdit }) => {
   return (
-    <div className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-slate-800/50 group transition-all border border-transparent hover:border-slate-800">
+    <div
+      onClick={() => onEdit && onEdit(food)}
+      className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-slate-800/60 group transition-all border border-transparent hover:border-slate-800 cursor-pointer"
+    >
       <div className="flex-1 min-w-0 pr-3">
         <div className="flex items-center gap-1.5">
-          <h4 className="text-sm font-semibold text-slate-100 truncate">{food.name}</h4>
+          <h4 className="text-sm font-semibold text-slate-100 truncate group-hover:text-cyan-300 transition-colors">
+            {food.name}
+          </h4>
           {food.brand && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-medium">
               {food.brand}
@@ -35,7 +41,10 @@ export const FoodItemRow: React.FC<FoodItemRowProps> = ({ food, onRemove }) => {
           {food.calories} <span className="text-[10px] font-normal text-slate-400">kcal</span>
         </span>
         <button
-          onClick={() => onRemove(food.logId)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(food.logId);
+          }}
           className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/40 opacity-70 group-hover:opacity-100 transition-all cursor-pointer"
           title="Rimuovi alimento"
         >

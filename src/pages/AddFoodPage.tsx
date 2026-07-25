@@ -54,7 +54,9 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   const [selectedMeal, setSelectedMeal] = useState<MealType>(initialMealType);
   const [activeTab, setActiveTab] = useState<FoodTab>('recent');
   const [selectedFoodForServing, setSelectedFoodForServing] = useState<FoodItem | null>(null);
-  const [servingsInput, setServingsInput] = useState<number>(1);
+  const [servingsInput, setServingsInput] = useState<number>(100);
+  const [portionMode, setPortionMode] = useState<'grams' | 'portions'>('grams');
+  const [portionCountInput, setPortionCountInput] = useState<number>(1);
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [addedFoodIds, setAddedFoodIds] = useState<Set<string>>(new Set());
 
@@ -268,12 +270,48 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     }
   }, [searchQuery, activeTab, apiFoods, recentFoods, customFoods]);
 
+  const unitWeightGrams = useMemo(() => {
+    if (!selectedFoodForServing) return 100;
+    if (selectedFoodForServing.servingAmount && selectedFoodForServing.servingAmount > 10) {
+      return selectedFoodForServing.servingAmount;
+    }
+    const match = selectedFoodForServing.servingSize?.match(/(\d+)\s*g/i);
+    if (match) return parseInt(match[1], 10);
+    return 100;
+  }, [selectedFoodForServing]);
+
+  const totalWeightInGrams = useMemo(() => {
+    if (portionMode === 'grams') return Math.max(1, servingsInput || 1);
+    return Math.max(1, Math.round((portionCountInput || 1) * unitWeightGrams));
+  }, [portionMode, servingsInput, portionCountInput, unitWeightGrams]);
+
+  const calculatedValues = useMemo(() => {
+    if (!selectedFoodForServing) return { calories: 0, carbs: 0, fat: 0, protein: 0 };
+    const baseWeight = selectedFoodForServing.servingAmount || 100;
+    const calPer100 = (selectedFoodForServing.calories / baseWeight) * 100;
+    const carbsPer100 = (selectedFoodForServing.macros.carbs / baseWeight) * 100;
+    const fatPer100 = (selectedFoodForServing.macros.fat / baseWeight) * 100;
+    const proteinPer100 = (selectedFoodForServing.macros.protein / baseWeight) * 100;
+
+    return {
+      calories: Math.round((calPer100 * totalWeightInGrams) / 100),
+      carbs: Math.round(((carbsPer100 * totalWeightInGrams) / 100) * 10) / 10,
+      fat: Math.round(((fatPer100 * totalWeightInGrams) / 100) * 10) / 10,
+      protein: Math.round(((proteinPer100 * totalWeightInGrams) / 100) * 10) / 10,
+    };
+  }, [selectedFoodForServing, totalWeightInGrams]);
+
   const handleSelectFood = (food: FoodItem) => {
     setSelectedFoodForServing(food);
+    const uWeight = food.servingAmount > 10 ? food.servingAmount : 100;
     if (food.id.startsWith('off_') || food.id.startsWith('custom_')) {
+      setPortionMode('grams');
       setServingsInput(100);
+      setPortionCountInput(1);
     } else {
-      setServingsInput(1);
+      setPortionMode('portions');
+      setPortionCountInput(1);
+      setServingsInput(uWeight);
     }
   };
 
@@ -292,19 +330,26 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     }, 1500);
   };
 
-  const multiplier = useMemo(() => {
-    if (!selectedFoodForServing) return 1;
-    return (selectedFoodForServing.id.startsWith('off_') || selectedFoodForServing.id.startsWith('custom_'))
-      ? servingsInput / 100
-      : servingsInput;
-  }, [selectedFoodForServing, servingsInput]);
-
   const handleConfirmServingAdd = async () => {
     if (!selectedFoodForServing || !user) return;
-    await addFoodLog(user.id, selectedDate, selectedFoodForServing, selectedMeal, multiplier);
+    const foodToSave: FoodItem = {
+      ...selectedFoodForServing,
+      calories: calculatedValues.calories,
+      macros: {
+        carbs: calculatedValues.carbs,
+        fat: calculatedValues.fat,
+        protein: calculatedValues.protein,
+      },
+      servingSize: portionMode === 'grams'
+        ? `${totalWeightInGrams}g`
+        : `${portionCountInput} ${portionCountInput === 1 ? 'porzione' : 'porzioni'} (${totalWeightInGrams}g)`
+    };
+
+    await addFoodLog(user.id, selectedDate, foodToSave, selectedMeal, 1);
     await fetchLogsForDate(user.id, selectedDate);
     setSelectedFoodForServing(null);
-    setServingsInput(1);
+    setServingsInput(100);
+    setPortionCountInput(1);
     onFoodAdded();
   };
 
@@ -1130,81 +1175,87 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
         </div>
       )}
 
-      {/* Selected Food Servings adjustment modal popup with Smart Portion Selector */}
+      {/* Selected Food Servings adjustment modal popup with Dual Selector */}
       {selectedFoodForServing && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6">
             <h3 className="text-lg font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
             <p className="text-xs text-slate-400 mb-3">{selectedFoodForServing.brand || 'Alimento Generico'}</p>
 
-            {/* Calculated Macros Badge */}
+            {/* Segmented Toggle Control */}
+            <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setPortionMode('grams');
+                  setServingsInput(totalWeightInGrams);
+                }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  portionMode === 'grams'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Grammi (g)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPortionMode('portions');
+                  setPortionCountInput(Math.round((totalWeightInGrams / unitWeightGrams) * 10) / 10 || 1);
+                }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  portionMode === 'portions'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Porzioni
+              </button>
+            </div>
+
+            {/* Live Calculated Macros Badge */}
             <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 font-mono text-center">
               <span className="text-2xl font-black text-cyan-400">
-                {Math.round(selectedFoodForServing.calories * multiplier)}{' '}
+                {calculatedValues.calories}{' '}
                 <span className="text-xs font-normal text-slate-400">kcal</span>
               </span>
               <div className="flex justify-center gap-4 text-xs mt-2 text-slate-300">
-                <span className="text-blue-400">
-                  {Math.round(selectedFoodForServing.macros.carbs * multiplier * 10) / 10}g C
+                <span className="text-blue-400 font-semibold">
+                  {calculatedValues.carbs}g C
                 </span>
-                <span className="text-red-400">
-                  {Math.round(selectedFoodForServing.macros.fat * multiplier * 10) / 10}g F
+                <span className="text-red-400 font-semibold">
+                  {calculatedValues.fat}g F
                 </span>
-                <span className="text-emerald-400">
-                  {Math.round(selectedFoodForServing.macros.protein * multiplier * 10) / 10}g P
+                <span className="text-emerald-400 font-semibold">
+                  {calculatedValues.protein}g P
                 </span>
               </div>
             </div>
 
-            {/* Smart Portion Presets */}
-            {(() => {
-              const lowerName = selectedFoodForServing.name.toLowerCase();
-              let matchedPreset: { unitName: string; defaultGrams: number } | null = null;
-
-              if (lowerName.includes('mela')) matchedPreset = { unitName: '1 Mela (media)', defaultGrams: 150 };
-              else if (lowerName.includes('banana')) matchedPreset = { unitName: '1 Banana (media)', defaultGrams: 120 };
-              else if (lowerName.includes('arancia')) matchedPreset = { unitName: '1 Arancia', defaultGrams: 130 };
-              else if (lowerName.includes('uovo')) matchedPreset = { unitName: '1 Uovo (medio)', defaultGrams: 50 };
-              else if (lowerName.includes('albume')) matchedPreset = { unitName: '1 Albume d\'uovo', defaultGrams: 35 };
-              else if (lowerName.includes('pollo')) matchedPreset = { unitName: '1 Petto di Pollo', defaultGrams: 150 };
-              else if (lowerName.includes('tacchino')) matchedPreset = { unitName: '1 Petto di Tacchino', defaultGrams: 150 };
-              else if (lowerName.includes('bistecca')) matchedPreset = { unitName: '1 Bistecca', defaultGrams: 200 };
-              else if (lowerName.includes('salmone')) matchedPreset = { unitName: '1 Filetto Salmone', defaultGrams: 150 };
-              else if (lowerName.includes('mozzarella')) matchedPreset = { unitName: '1 Mozzarella', defaultGrams: 125 };
-              else if (lowerName.includes('yogurt')) matchedPreset = { unitName: '1 Vasetto Yogurt', defaultGrams: 150 };
-              else if (lowerName.includes('pane')) matchedPreset = { unitName: '1 Rosetta / Fetta', defaultGrams: 60 };
-              else if (lowerName.includes('patat')) matchedPreset = { unitName: '1 Patata', defaultGrams: 150 };
-
-              return (
-                <div className="space-y-3 mb-5">
-                  {matchedPreset && (
-                    <div className="bg-cyan-950/30 border border-cyan-800/40 p-2.5 rounded-2xl text-[11px] text-cyan-300 flex items-center justify-between">
-                      <span className="font-semibold">Unità standard:</span>
-                      <span className="font-bold font-mono">{matchedPreset.unitName} ≈ {matchedPreset.defaultGrams}g</span>
-                    </div>
-                  )}
-
-                  {/* Quantity In Grams Field */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-bold text-slate-300">
-                        Peso / Quantità in Grammi (g)
-                      </label>
-                      <span className="text-[10px] text-slate-500 font-mono">Totale: {Math.round(servingsInput)}g</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="5"
-                      min="1"
-                      max="3000"
-                      value={servingsInput}
-                      onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 100))}
-                      className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                    />
+            {/* Quantity Controls */}
+            <div className="space-y-3 mb-5">
+              {portionMode === 'grams' ? (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-slate-300">
+                      Peso in Grammi (g)
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      ≈ {(totalWeightInGrams / unitWeightGrams).toFixed(1)} porzioni
+                    </span>
                   </div>
-
-                  {/* Quick Gram Presets */}
-                  <div className="flex gap-1.5 justify-center">
+                  <input
+                    type="number"
+                    step="5"
+                    min="1"
+                    max="3000"
+                    inputMode="decimal"
+                    value={servingsInput}
+                    onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 1))}
+                    className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                  />
+                  <div className="flex gap-1.5 justify-center mt-2">
                     {[50, 100, 150, 200, 250].map((presetG) => (
                       <button
                         key={presetG}
@@ -1221,8 +1272,45 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                     ))}
                   </div>
                 </div>
-              );
-            })()}
+              ) : (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-slate-300">
+                      Numero di Porzioni
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      1 porzione = {unitWeightGrams}g
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min="0.1"
+                    max="50"
+                    inputMode="decimal"
+                    value={portionCountInput}
+                    onChange={(e) => setPortionCountInput(Math.max(0.1, parseFloat(e.target.value) || 1))}
+                    className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                  />
+                  <div className="flex gap-1.5 justify-center mt-2">
+                    {[0.5, 1, 1.5, 2, 3].map((presetP) => (
+                      <button
+                        key={presetP}
+                        type="button"
+                        onClick={() => setPortionCountInput(presetP)}
+                        className={`py-1 px-2 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                          portionCountInput === presetP
+                            ? 'bg-cyan-500 text-slate-950 shadow-md'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {presetP} {presetP === 1 ? 'porz' : 'porzioni'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2">
               <button

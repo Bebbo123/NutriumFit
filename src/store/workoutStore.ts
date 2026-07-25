@@ -8,9 +8,12 @@ export interface ActiveWorkout {
   id: string; // Temporary local ID or DB ID
   title: string;
   startedAt: string;
+  notes?: string | null;
   exercises: {
     exercise: Exercise;
     sets: WorkoutSet[];
+    notes?: string | null;
+    routineNotes?: string | null;
     previousSets?: PreviousSetPerformance[];
     allTimePR?: ExercisePR;
     lastWeekMax?: LastWeekMax | null;
@@ -39,6 +42,8 @@ interface WorkoutStore {
   removeSet: (exerciseId: string, setId: string) => void;
   updateSet: (exerciseId: string, setId: string, updates: Partial<WorkoutSet>) => void;
   completeSet: (exerciseId: string, setId: string, isCompleted: boolean) => void;
+  updateExerciseNotes: (exerciseId: string, notes: string) => void;
+  updateWorkoutNotes: (notes: string) => void;
   copyPreviousPerformance: (exerciseId: string) => void;
   copyLastWeekPerformance: (exerciseId: string) => void;
   loadExerciseHistoryData: (userId: string, exerciseId: string) => Promise<void>;
@@ -82,7 +87,8 @@ export const useWorkoutStore = create<WorkoutStore>()(
            }));
            return {
              exercise: re.exercise!,
-             sets: initialSets
+             sets: initialSets,
+             routineNotes: re.notes || null,
            };
         }) : [];
 
@@ -91,6 +97,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
             id: uuidv4(),
             title,
             startedAt: new Date().toISOString(),
+            notes: '',
             exercises
           }
         });
@@ -100,6 +107,36 @@ export const useWorkoutStore = create<WorkoutStore>()(
             get().loadExerciseHistoryData(userId, ex.exercise.id);
           });
         }
+      },
+
+      updateExerciseNotes: (exerciseId, notes) => {
+        set((state) => {
+          if (!state.activeWorkout) return state;
+          const updatedExercises = state.activeWorkout.exercises.map((item) => {
+            if (item.exercise.id === exerciseId) {
+              return { ...item, notes };
+            }
+            return item;
+          });
+          return {
+            activeWorkout: {
+              ...state.activeWorkout,
+              exercises: updatedExercises,
+            },
+          };
+        });
+      },
+
+      updateWorkoutNotes: (notes) => {
+        set((state) => {
+          if (!state.activeWorkout) return state;
+          return {
+            activeWorkout: {
+              ...state.activeWorkout,
+              notes,
+            },
+          };
+        });
       },
 
       cancelWorkout: () => set({ activeWorkout: null, restTimerTarget: null }),

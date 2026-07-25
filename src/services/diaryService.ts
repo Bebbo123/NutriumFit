@@ -348,6 +348,55 @@ export const diaryService = {
   },
 
   /**
+   * Updates an existing food entry in public.food_entries
+   */
+  async updateFoodEntry(
+    entryId: string,
+    mealType: MealType,
+    foodName: string,
+    calories: number,
+    carbs: number,
+    fat: number,
+    protein: number
+  ): Promise<boolean> {
+    try {
+      if (!navigator.onLine || entryId.startsWith('offline_')) throw new Error('Offline');
+      const { error } = await supabase
+        .from('food_entries')
+        .update({
+          meal_type: mealType,
+          food_name: foodName,
+          calories: Math.round(calories),
+          carbs: Math.round(carbs * 10) / 10,
+          fat: Math.round(fat * 10) / 10,
+          protein: Math.round(protein * 10) / 10,
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('updateFoodEntry falling back to IndexedDB/local state:', err);
+      try {
+        const cached = await db.logs.get(entryId);
+        if (cached) {
+          const food = JSON.parse(cached.foodItemJson);
+          food.name = foodName;
+          food.calories = calories;
+          food.macros = { carbs, fat, protein };
+          await db.logs.update(entryId, {
+            mealType,
+            foodItemJson: JSON.stringify(food),
+          });
+        }
+      } catch (e) {
+        console.warn('IndexedDB update failed', e);
+      }
+      return true;
+    }
+  },
+
+  /**
    * Fetches custom foods created by the user matching a search query
    */
   async searchCustomFoods(userId: string, query: string): Promise<FoodItem[]> {

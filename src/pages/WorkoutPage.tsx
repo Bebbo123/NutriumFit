@@ -409,6 +409,16 @@ export const WorkoutPage: React.FC = () => {
                         <div><span className="text-slate-500 uppercase text-[10px] block">Volume</span>{log.total_volume} kg</div>
                         <div><span className="text-slate-500 uppercase text-[10px] block">Calorie</span>{log.calories_burned} kcal</div>
                       </div>
+
+                      {log.notes && (
+                        <div className="mt-3 p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl text-xs text-slate-300">
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-0.5">
+                            <FileText className="w-3 h-3 text-cyan-400" />
+                            Note Allenamento:
+                          </div>
+                          <p className="italic text-slate-300 font-sans">{log.notes}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -26,6 +26,7 @@ export interface RoutineExercise {
   order_index: number;
   target_sets?: number | null;
   target_reps?: string | null;
+  notes?: string | null;
   exercise?: Exercise; // For UI joining
 }
 
@@ -38,6 +39,7 @@ export interface WorkoutLog {
   calories_burned: number;
   started_at: string;
   completed_at: string;
+  notes?: string | null;
 }
 
 export interface WorkoutSet {
@@ -49,6 +51,7 @@ export interface WorkoutSet {
   reps: number | null;
   set_type: SetType;
   is_completed: boolean;
+  notes?: string | null;
   created_at?: string;
   
   // Active UI & Historical features
