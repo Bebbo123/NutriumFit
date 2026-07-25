@@ -43,10 +43,14 @@ export const diaryService = {
    * Fetches user profile goals from user_profiles or public.profiles
    */
   async fetchProfile(userId: string): Promise<DailyGoals | null> {
-    if (!navigator.onLine) return null;
+    if (!navigator.onLine) {
+      console.warn('FALLBACK APPLIED BECAUSE: navigator is offline during fetchProfile');
+      return null;
+    }
 
     try {
       let data: any = null;
+      let lastError: any = null;
 
       // 1. Try user_profiles table first using maybeSingle()
       const resUserProfiles = await supabase
@@ -58,6 +62,7 @@ export const diaryService = {
       if (!resUserProfiles.error && resUserProfiles.data) {
         data = resUserProfiles.data;
       } else {
+        lastError = resUserProfiles.error;
         // 2. Fallback: try profiles table
         const resProfiles = await supabase
           .from('profiles')
@@ -67,27 +72,74 @@ export const diaryService = {
 
         if (!resProfiles.error && resProfiles.data) {
           data = resProfiles.data;
-        } else if (resProfiles.error && resUserProfiles.error) {
-          console.warn('Both user_profiles and profiles fetch returned notice/error:', resUserProfiles.error, resProfiles.error);
+        } else {
+          lastError = resProfiles.error || lastError;
         }
       }
 
-      if (!data) return null;
+      if (!data) {
+        console.warn('FALLBACK APPLIED BECAUSE:', lastError || 'data is empty / profile row missing in Supabase');
+        return null;
+      }
 
-      const calories = Number(data.target_calories ?? data.daily_calorie_goal ?? 2200);
-      const carbs = Number(data.target_carbs_g ?? data.carb_goal ?? 250);
-      const fat = Number(data.target_fat_g ?? data.fat_goal ?? 70);
-      const protein = Number(data.target_protein_g ?? data.protein_goal ?? 150);
-      const waterMl = Number(data.target_water_ml ?? data.water_goal_ml ?? 2000);
-      const steps = Number(data.target_steps ?? data.steps_goal ?? 10000);
+      console.log('SUPABASE RAW PROFILE:', data);
 
-      return {
-        calories: isNaN(calories) ? 2200 : calories,
-        carbs: isNaN(carbs) ? 250 : carbs,
-        fat: isNaN(fat) ? 70 : fat,
-        protein: isNaN(protein) ? 150 : protein,
-        waterMl: isNaN(waterMl) ? 2000 : waterMl,
-        steps: isNaN(steps) ? 10000 : steps,
+      const calories = data.target_calories !== undefined && data.target_calories !== null
+        ? Number(data.target_calories)
+        : data.daily_calorie_goal !== undefined && data.daily_calorie_goal !== null
+        ? Number(data.daily_calorie_goal)
+        : data.calories !== undefined && data.calories !== null
+        ? Number(data.calories)
+        : null;
+
+      const carbs = data.target_carbs_g !== undefined && data.target_carbs_g !== null
+        ? Number(data.target_carbs_g)
+        : data.carb_goal !== undefined && data.carb_goal !== null
+        ? Number(data.carb_goal)
+        : data.carbs !== undefined && data.carbs !== null
+        ? Number(data.carbs)
+        : null;
+
+      const fat = data.target_fat_g !== undefined && data.target_fat_g !== null
+        ? Number(data.target_fat_g)
+        : data.fat_goal !== undefined && data.fat_goal !== null
+        ? Number(data.fat_goal)
+        : data.fat !== undefined && data.fat !== null
+        ? Number(data.fat)
+        : null;
+
+      const protein = data.target_protein_g !== undefined && data.target_protein_g !== null
+        ? Number(data.target_protein_g)
+        : data.protein_goal !== undefined && data.protein_goal !== null
+        ? Number(data.protein_goal)
+        : data.protein !== undefined && data.protein !== null
+        ? Number(data.protein)
+        : null;
+
+      const waterMl = data.target_water_ml !== undefined && data.target_water_ml !== null
+        ? Number(data.target_water_ml)
+        : data.water_goal_ml !== undefined && data.water_goal_ml !== null
+        ? Number(data.water_goal_ml)
+        : null;
+
+      const steps = data.target_steps !== undefined && data.target_steps !== null
+        ? Number(data.target_steps)
+        : data.steps_goal !== undefined && data.steps_goal !== null
+        ? Number(data.steps_goal)
+        : null;
+
+      if (calories === null && carbs === null && fat === null && protein === null) {
+        console.warn('FALLBACK APPLIED BECAUSE: data is empty / goal properties are missing');
+        return null;
+      }
+
+      const result: DailyGoals = {
+        calories: calories ?? 2200,
+        carbs: carbs ?? 250,
+        fat: fat ?? 70,
+        protein: protein ?? 150,
+        waterMl: waterMl ?? 2000,
+        steps: steps ?? 10000,
         macroInputMode: data.macro_input_mode || 'grams',
         currentWeight: data.current_weight !== undefined && data.current_weight !== null ? Number(data.current_weight) : undefined,
         targetWeight: data.target_weight !== undefined && data.target_weight !== null ? Number(data.target_weight) : undefined,
@@ -97,8 +149,11 @@ export const diaryService = {
         gender: data.gender || undefined,
         height: data.height !== undefined && data.height !== null ? Number(data.height) : undefined,
       };
+
+      console.log('PARSED GOALS FROM SUPABASE:', result);
+      return result;
     } catch (err) {
-      console.warn('fetchProfile falling back to default/persisted:', err);
+      console.warn('FALLBACK APPLIED BECAUSE:', err);
       return null;
     }
   },
@@ -108,6 +163,7 @@ export const diaryService = {
    */
   async updateProfileGoals(userId: string, goals: Partial<DailyGoals>): Promise<boolean> {
     if (!navigator.onLine) {
+      console.warn('FALLBACK APPLIED BECAUSE: navigator is offline during updateProfileGoals');
       throw new Error('Offline');
     }
 
@@ -120,18 +176,22 @@ export const diaryService = {
     if (goals.calories !== undefined) {
       upsertPayload.daily_calorie_goal = goals.calories;
       upsertPayload.target_calories = goals.calories;
+      upsertPayload.calories = goals.calories;
     }
     if (goals.carbs !== undefined) {
       upsertPayload.carb_goal = goals.carbs;
       upsertPayload.target_carbs_g = goals.carbs;
+      upsertPayload.carbs = goals.carbs;
     }
     if (goals.fat !== undefined) {
       upsertPayload.fat_goal = goals.fat;
       upsertPayload.target_fat_g = goals.fat;
+      upsertPayload.fat = goals.fat;
     }
     if (goals.protein !== undefined) {
       upsertPayload.protein_goal = goals.protein;
       upsertPayload.target_protein_g = goals.protein;
+      upsertPayload.protein = goals.protein;
     }
     if (goals.waterMl !== undefined) {
       upsertPayload.water_goal_ml = goals.waterMl;
@@ -152,12 +212,15 @@ export const diaryService = {
     if (goals.gender !== undefined) upsertPayload.gender = goals.gender;
     if (goals.height !== undefined) upsertPayload.height = goals.height;
 
+    console.log('[updateProfileGoals] Attempting UPSERT to user_profiles with payload:', upsertPayload);
+
     // 1. Try UPSERT into user_profiles
     const userProfilesRes = await supabase
       .from('user_profiles')
       .upsert(upsertPayload, { onConflict: 'id' });
 
     if (!userProfilesRes.error) {
+      console.log('[updateProfileGoals] UPSERT into user_profiles succeeded!');
       return true;
     }
 
@@ -169,6 +232,7 @@ export const diaryService = {
       .upsert(upsertPayload, { onConflict: 'id' });
 
     if (!profilesRes.error) {
+      console.log('[updateProfileGoals] UPSERT into profiles succeeded!');
       return true;
     }
 

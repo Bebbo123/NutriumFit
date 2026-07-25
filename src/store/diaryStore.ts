@@ -193,12 +193,33 @@ export const useDiaryStore = create<DiaryStore>()(
         try {
           const dbGoals = await diaryService.fetchProfile(userId);
           if (dbGoals) {
+            console.log('[fetchGoals] Applying fetched DB goals to Zustand store & localStorage:', dbGoals);
+            
+            // Hard-lock rehydration: ONLY set target numbers after fetchProfile returns valid data
             set((state) => ({
               goals: {
                 ...state.goals,
                 ...dbGoals,
               },
             }));
+
+            // Sync Zustand persistent storage in localStorage directly
+            try {
+              const currentStorageRaw = localStorage.getItem('nutriumfit-diary-storage');
+              if (currentStorageRaw) {
+                const parsed = JSON.parse(currentStorageRaw);
+                parsed.state = parsed.state || {};
+                parsed.state.goals = {
+                  ...parsed.state.goals,
+                  ...dbGoals,
+                };
+                localStorage.setItem('nutriumfit-diary-storage', JSON.stringify(parsed));
+              }
+            } catch (storageErr) {
+              console.warn('[fetchGoals] Error syncing to localStorage:', storageErr);
+            }
+          } else {
+            console.warn('[fetchGoals] fetchProfile returned null, preserving existing state/local storage goals');
           }
         } catch (err) {
           console.error('Error in fetchGoals store action:', err);
