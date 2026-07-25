@@ -25,7 +25,7 @@
   padding-top: max(1.5rem, env(safe-area-inset-top, 1.5rem));
 }
 .pt-safe-modal {
-  padding-top: max(2.5rem, calc(env(safe-area-inset-top, 0px) + 1.5rem));
+  padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 1.75rem));
 }
 
 /* Glassmorphism utility */

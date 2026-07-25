@@ -650,16 +650,18 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   // Render Recipe Builder Overlay
   if (showRecipeBuilder) {
     return (
-      <div className="pb-24 pt-4 px-4 max-w-md mx-auto min-h-screen bg-slate-950 font-sans text-slate-100">
+      <div className="pb-24 pt-safe-modal px-4 max-w-md mx-auto min-h-screen bg-slate-950 font-sans text-slate-100">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button
+            type="button"
             onClick={() => setShowRecipeBuilder(false)}
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+            className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white cursor-pointer transition-colors active:scale-95 shadow-md shrink-0"
+            title="Torna indietro"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 text-cyan-400" />
           </button>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-lg font-extrabold text-white">Crea Nuova Ricetta</h1>
             <p className="text-xs text-slate-400">Componi una ricetta e calcola i macro per porzione</p>
           </div>
@@ -875,16 +877,18 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   }
 
   return (
-    <div className="pb-24 pt-4 px-4 max-w-md mx-auto min-h-screen bg-slate-950 font-sans text-slate-100">
+    <div className="pb-24 pt-safe-modal px-4 max-w-md mx-auto min-h-screen bg-slate-950 font-sans text-slate-100">
       {/* Top Header */}
       <div className="flex items-center gap-3 mb-4">
         <button
+          type="button"
           onClick={onBack}
-          className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors"
+          className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white cursor-pointer transition-colors active:scale-95 shadow-md shrink-0"
+          title="Torna indietro"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 text-cyan-400" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h1 className="text-lg font-extrabold text-white">Aggiungi Alimento</h1>
           <p className="text-xs text-slate-400">Cerca nel database o scansiona codice</p>
         </div>
