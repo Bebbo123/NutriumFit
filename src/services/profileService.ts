@@ -17,12 +17,7 @@ const isPGRST204 = (error: any): boolean => {
   );
 };
 
-const isPGRST116 = (error: any): boolean => {
-  if (!error) return false;
-  const code = String(error.code || '');
-  const message = String(error.message || '').toLowerCase();
-  return code === 'PGRST116' || message.includes('pgrst116');
-};
+
 
 export const profileService = {
   fetchUserProfile: async (userId: string): Promise<DailyGoals | null> => {
@@ -45,176 +40,159 @@ export const profileService = {
     }
 
     const activeUserId = authData.user.id || userId;
+    const nowIso = new Date().toISOString();
 
-    // Build payload compatible with both naming schemes (user_profiles & profiles)
-    const fullPayload: Record<string, any> = {
-      id: activeUserId,
-      updated_at: new Date().toISOString(),
+    // 1. Table-Specific Payload for public.profiles (daily_calorie_goal, carb_goal, etc.)
+    const buildProfilesPayload = (includeOptional = true): Record<string, any> => {
+      const payload: Record<string, any> = {
+        id: activeUserId,
+        updated_at: nowIso,
+      };
+      if (goals.calories !== undefined) payload.daily_calorie_goal = goals.calories;
+      if (goals.carbs !== undefined) payload.carb_goal = goals.carbs;
+      if (goals.fat !== undefined) payload.fat_goal = goals.fat;
+      if (goals.protein !== undefined) payload.protein_goal = goals.protein;
+      if (goals.waterMl !== undefined) payload.water_goal_ml = goals.waterMl;
+      if (goals.steps !== undefined) payload.steps_goal = goals.steps;
+
+      if (includeOptional) {
+        if (goals.currentWeight !== undefined) payload.current_weight = goals.currentWeight;
+        if (goals.targetWeight !== undefined) payload.target_weight = goals.targetWeight;
+        if (goals.weeklyGoal !== undefined) payload.weekly_goal = goals.weeklyGoal;
+        if (goals.activityLevel !== undefined) payload.activity_level = goals.activityLevel;
+        if (goals.age !== undefined) payload.age = goals.age;
+        if (goals.gender !== undefined) payload.gender = goals.gender;
+        if (goals.height !== undefined) payload.height = goals.height;
+        if (goals.macroInputMode !== undefined) payload.macro_input_mode = goals.macroInputMode;
+      }
+      return payload;
     };
 
-    if (goals.calories !== undefined) {
-      fullPayload.daily_calorie_goal = goals.calories;
-      fullPayload.target_calories = goals.calories;
-      fullPayload.calories = goals.calories;
-    }
-    if (goals.carbs !== undefined) {
-      fullPayload.carb_goal = goals.carbs;
-      fullPayload.target_carbs_g = goals.carbs;
-      fullPayload.carbs = goals.carbs;
-    }
-    if (goals.fat !== undefined) {
-      fullPayload.fat_goal = goals.fat;
-      fullPayload.target_fat_g = goals.fat;
-      fullPayload.fat = goals.fat;
-    }
-    if (goals.protein !== undefined) {
-      fullPayload.protein_goal = goals.protein;
-      fullPayload.target_protein_g = goals.protein;
-      fullPayload.protein = goals.protein;
-    }
-    if (goals.waterMl !== undefined) {
-      fullPayload.water_goal_ml = goals.waterMl;
-      fullPayload.target_water_ml = goals.waterMl;
-    }
-    if (goals.steps !== undefined) {
-      fullPayload.steps_goal = goals.steps;
-      fullPayload.target_steps = goals.steps;
-    }
-    if (goals.macroInputMode !== undefined) {
-      fullPayload.macro_input_mode = goals.macroInputMode;
-    }
-    if (goals.currentWeight !== undefined) fullPayload.current_weight = goals.currentWeight;
-    if (goals.targetWeight !== undefined) fullPayload.target_weight = goals.targetWeight;
-    if (goals.weeklyGoal !== undefined) fullPayload.weekly_goal = goals.weeklyGoal;
-    if (goals.activityLevel !== undefined) fullPayload.activity_level = goals.activityLevel;
-    if (goals.age !== undefined) fullPayload.age = goals.age;
-    if (goals.gender !== undefined) fullPayload.gender = goals.gender;
-    if (goals.height !== undefined) fullPayload.height = goals.height;
+    // 2. Table-Specific Payload for public.user_profiles (target_calories, target_carbs_g, etc.)
+    const buildUserProfilesPayload = (includeOptional = true): Record<string, any> => {
+      const payload: Record<string, any> = {
+        id: activeUserId,
+        updated_at: nowIso,
+      };
+      if (goals.calories !== undefined) payload.target_calories = goals.calories;
+      if (goals.carbs !== undefined) payload.target_carbs_g = goals.carbs;
+      if (goals.fat !== undefined) payload.target_fat_g = goals.fat;
+      if (goals.protein !== undefined) payload.target_protein_g = goals.protein;
+      if (goals.waterMl !== undefined) payload.target_water_ml = goals.waterMl;
+      if (goals.steps !== undefined) payload.target_steps = goals.steps;
 
-    // Remove undefined values
-    Object.keys(fullPayload).forEach((key) => {
-      if (fullPayload[key] === undefined) delete fullPayload[key];
-    });
-
-    console.log('[updateUserProfileGoals] Attempt 1: Upserting full payload to profiles table...', fullPayload);
+      if (includeOptional) {
+        if (goals.currentWeight !== undefined) payload.current_weight = goals.currentWeight;
+        if (goals.targetWeight !== undefined) payload.target_weight = goals.targetWeight;
+        if (goals.weeklyGoal !== undefined) payload.weekly_goal = goals.weeklyGoal;
+        if (goals.activityLevel !== undefined) payload.activity_level = goals.activityLevel;
+        if (goals.age !== undefined) payload.age = goals.age;
+        if (goals.gender !== undefined) payload.gender = goals.gender;
+        if (goals.height !== undefined) payload.height = goals.height;
+        if (goals.macroInputMode !== undefined) payload.macro_input_mode = goals.macroInputMode;
+      }
+      return payload;
+    };
 
     let lastError: any = null;
 
-    // 1. Dual Table Persistence Attempt: Try profiles table first
-    const profilesRes = await supabase
-      .from('profiles')
-      .upsert(fullPayload, { onConflict: 'id' });
-
-    if (!profilesRes.error) {
-      console.log('[updateUserProfileGoals] UPSERT into profiles succeeded!');
+    // --- STRATEGY 1: Save to profiles table first ---
+    let profPayload = buildProfilesPayload(true);
+    console.log('[updateUserProfileGoals] Attempt 1: Upserting to profiles table:', profPayload);
+    let res = await supabase.from('profiles').upsert(profPayload, { onConflict: 'id' });
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Successfully saved to profiles (upsert full)');
       return true;
     }
+    lastError = res.error;
+    console.warn('[updateUserProfileGoals] profiles full upsert failed:', res.error);
 
-    lastError = profilesRes.error;
-    console.warn('[updateUserProfileGoals] UPSERT into profiles failed:', lastError);
-
-    // 2. Dual Table Persistence Attempt: Failover to user_profiles if profiles fails with PGRST204, PGRST116, or schema mismatch
-    if (isPGRST204(lastError) || isPGRST116(lastError) || lastError) {
-      console.log('[updateUserProfileGoals] Attempt 2: Failover UPSERT to user_profiles table with full payload...');
-      const userProfilesRes = await supabase
-        .from('user_profiles')
-        .upsert(fullPayload, { onConflict: 'id' });
-
-      if (!userProfilesRes.error) {
-        console.log('[updateUserProfileGoals] UPSERT into user_profiles succeeded!');
+    if (isPGRST204(res.error)) {
+      profPayload = buildProfilesPayload(false);
+      console.log('[updateUserProfileGoals] Attempt 1B: Retrying profiles upsert with cleaned core payload:', profPayload);
+      res = await supabase.from('profiles').upsert(profPayload, { onConflict: 'id' });
+      if (!res.error) {
+        console.log('[updateUserProfileGoals] Successfully saved to profiles (upsert cleaned)');
         return true;
       }
-
-      lastError = userProfilesRes.error;
-      console.warn('[updateUserProfileGoals] UPSERT into user_profiles failed:', lastError);
+      lastError = res.error;
     }
 
-    // 3. Dynamic Payload Cleaning: If an upsert returns error PGRST204 (missing column like macro_input_mode),
-    // automatically strip optional layout fields and retry saving core goals
-    const coreCleanPayload: Record<string, any> = { ...fullPayload };
-    delete coreCleanPayload.macro_input_mode; // Strip layout field causing PGRST204 schema cache mismatch
-
-    console.log('[updateUserProfileGoals] Attempt 3: Dynamic Payload Cleaning - Retrying core goals on profiles table:', coreCleanPayload);
-    const profilesCleanRes = await supabase
-      .from('profiles')
-      .upsert(coreCleanPayload, { onConflict: 'id' });
-
-    if (!profilesCleanRes.error) {
-      console.log('[updateUserProfileGoals] Stripped core UPSERT into profiles succeeded!');
+    console.log('[updateUserProfileGoals] Attempt 1C: Trying update on profiles table...');
+    res = await supabase.from('profiles').update(profPayload).eq('id', activeUserId);
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Successfully saved to profiles (update)');
       return true;
     }
+    lastError = res.error || lastError;
 
-    lastError = profilesCleanRes.error;
-    console.warn('[updateUserProfileGoals] Stripped core UPSERT into profiles failed:', lastError);
-
-    // 4. Retry cleaned core goals on user_profiles table
-    console.log('[updateUserProfileGoals] Attempt 4: Dynamic Payload Cleaning - Retrying core goals on user_profiles table...');
-    const userProfilesCleanRes = await supabase
-      .from('user_profiles')
-      .upsert(coreCleanPayload, { onConflict: 'id' });
-
-    if (!userProfilesCleanRes.error) {
-      console.log('[updateUserProfileGoals] Stripped core UPSERT into user_profiles succeeded!');
+    // --- STRATEGY 2: Failover to user_profiles table ---
+    let uProfPayload = buildUserProfilesPayload(true);
+    console.log('[updateUserProfileGoals] Attempt 2: Failover upsert to user_profiles table:', uProfPayload);
+    res = await supabase.from('user_profiles').upsert(uProfPayload, { onConflict: 'id' });
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Successfully saved to user_profiles (upsert full)');
       return true;
     }
+    lastError = res.error;
+    console.warn('[updateUserProfileGoals] user_profiles full upsert failed:', res.error);
 
-    lastError = userProfilesCleanRes.error;
-    console.warn('[updateUserProfileGoals] Stripped core UPSERT into user_profiles failed:', lastError);
+    if (isPGRST204(res.error)) {
+      uProfPayload = buildUserProfilesPayload(false);
+      console.log('[updateUserProfileGoals] Attempt 2B: Retrying user_profiles upsert with cleaned core payload:', uProfPayload);
+      res = await supabase.from('user_profiles').upsert(uProfPayload, { onConflict: 'id' });
+      if (!res.error) {
+        console.log('[updateUserProfileGoals] Successfully saved to user_profiles (upsert cleaned)');
+        return true;
+      }
+      lastError = res.error;
+    }
 
-    // 5. Final fallback attempt using minimal target columns only
-    const minimalPayload: Record<string, any> = {
+    console.log('[updateUserProfileGoals] Attempt 2C: Trying update on user_profiles table...');
+    res = await supabase.from('user_profiles').update(uProfPayload).eq('id', activeUserId);
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Successfully saved to user_profiles (update)');
+      return true;
+    }
+    lastError = res.error || lastError;
+
+    // --- STRATEGY 3: Minimal Core Nutrition Payload (only calories, carbs, fat, protein) ---
+    const minProfiles = {
       id: activeUserId,
-      updated_at: new Date().toISOString(),
+      daily_calorie_goal: goals.calories,
+      carb_goal: goals.carbs,
+      fat_goal: goals.fat,
+      protein_goal: goals.protein,
+      updated_at: nowIso,
     };
-    if (goals.calories !== undefined) {
-      minimalPayload.target_calories = goals.calories;
-      minimalPayload.daily_calorie_goal = goals.calories;
-    }
-    if (goals.carbs !== undefined) {
-      minimalPayload.target_carbs_g = goals.carbs;
-      minimalPayload.carb_goal = goals.carbs;
-    }
-    if (goals.protein !== undefined) {
-      minimalPayload.target_protein_g = goals.protein;
-      minimalPayload.protein_goal = goals.protein;
-    }
-    if (goals.fat !== undefined) {
-      minimalPayload.target_fat_g = goals.fat;
-      minimalPayload.fat_goal = goals.fat;
-    }
-    if (goals.waterMl !== undefined) {
-      minimalPayload.target_water_ml = goals.waterMl;
-      minimalPayload.water_goal_ml = goals.waterMl;
-    }
-    if (goals.steps !== undefined) {
-      minimalPayload.target_steps = goals.steps;
-      minimalPayload.steps_goal = goals.steps;
-    }
+    Object.keys(minProfiles).forEach((k) => (minProfiles as any)[k] === undefined && delete (minProfiles as any)[k]);
 
-    console.log('[updateUserProfileGoals] Attempt 5: Minimal target columns UPSERT on profiles...');
-    const minimalProfilesRes = await supabase
-      .from('profiles')
-      .upsert(minimalPayload, { onConflict: 'id' });
-
-    if (!minimalProfilesRes.error) {
-      console.log('[updateUserProfileGoals] Minimal UPSERT into profiles succeeded!');
+    res = await supabase.from('profiles').upsert(minProfiles, { onConflict: 'id' });
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Successfully saved minimal goals to profiles!');
       return true;
     }
 
-    console.log('[updateUserProfileGoals] Attempt 6: Minimal target columns UPSERT on user_profiles...');
-    const minimalUserProfilesRes = await supabase
-      .from('user_profiles')
-      .upsert(minimalPayload, { onConflict: 'id' });
+    const minUserProfiles = {
+      id: activeUserId,
+      target_calories: goals.calories,
+      target_carbs_g: goals.carbs,
+      target_fat_g: goals.fat,
+      target_protein_g: goals.protein,
+      updated_at: nowIso,
+    };
+    Object.keys(minUserProfiles).forEach((k) => (minUserProfiles as any)[k] === undefined && delete (minUserProfiles as any)[k]);
 
-    if (!minimalUserProfilesRes.error) {
-      console.log('[updateUserProfileGoals] Minimal UPSERT into user_profiles succeeded!');
+    res = await supabase.from('user_profiles').upsert(minUserProfiles, { onConflict: 'id' });
+    if (!res.error) {
+      console.log('[updateUserProfileGoals] Successfully saved minimal goals to user_profiles!');
       return true;
     }
 
-    lastError = minimalUserProfilesRes.error || lastError;
-    console.error('CRITICAL: Error saving user profile goals to Supabase PostgreSQL:', lastError);
+    lastError = res.error || lastError;
+    console.error('CRITICAL: All saving strategies failed for user profile goals:', lastError);
 
-    const errorMsg = lastError?.message || 'Errore durante il salvataggio degli obiettivi';
+    const errorMsg = lastError?.message || 'Errore durante il salvataggio degli obiettivi su Supabase';
     const errObj: any = new Error(errorMsg);
     errObj.code = lastError?.code;
     errObj.details = lastError?.details;
