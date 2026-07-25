@@ -50,12 +50,15 @@ interface DiaryStore {
   isLoadingRecipes: boolean;
   isLoadingSavedMeals: boolean;
   isOffline: boolean;
+  syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+  syncErrorMessage: string | null;
   deferredPrompt: any;
 
   // Actions
   setSelectedDate: (date: string) => void;
   setIsOffline: (status: boolean) => void;
   setDeferredPrompt: (prompt: any) => void;
+  forceCloudSync: (userId: string) => Promise<void>;
   syncOfflineQueue: () => Promise<void>;
   fetchGoals: (userId: string) => Promise<void>;
   fetchLogsForDate: (userId: string, date: string) => Promise<void>;
@@ -120,11 +123,29 @@ export const useDiaryStore = create<DiaryStore>()(
       isLoadingRecipes: false,
       isLoadingSavedMeals: false,
       isOffline: !navigator.onLine,
+      syncStatus: 'idle',
+      syncErrorMessage: null,
       deferredPrompt: null,
 
       setSelectedDate: (date) => set({ selectedDate: date }),
       setIsOffline: (status) => set({ isOffline: status }),
       setDeferredPrompt: (prompt) => set({ deferredPrompt: prompt }),
+
+      forceCloudSync: async (userId) => {
+        set({ syncStatus: 'syncing', syncErrorMessage: null });
+        try {
+          const date = get().selectedDate;
+          await Promise.all([
+            get().fetchGoals(userId),
+            get().fetchLogsForDate(userId, date),
+            get().fetchFavoriteFoods(userId),
+          ]);
+          set({ syncStatus: 'synced', syncErrorMessage: null });
+        } catch (err: any) {
+          console.warn('[forceCloudSync] Sync failed or timed out:', err);
+          set({ syncStatus: 'error', syncErrorMessage: err?.message || 'Sync timeout/error' });
+        }
+      },
 
       fetchExerciseCalories: async (userId, date) => {
         try {
@@ -213,7 +234,7 @@ export const useDiaryStore = create<DiaryStore>()(
       },
 
       fetchGoals: async (userId) => {
-        set({ isLoadingGoals: true });
+        set({ isLoadingGoals: true, syncStatus: 'syncing' });
         
         // Ensure active auth session check before fetch
         const { data: { session } } = await supabase.auth.getSession();
@@ -249,7 +270,7 @@ export const useDiaryStore = create<DiaryStore>()(
                 localStorage.setItem('user_goals_cache', JSON.stringify(finalGoals));
               } catch (e) {}
 
-              return { goals: finalGoals };
+              return { goals: finalGoals, syncStatus: 'synced', syncErrorMessage: null };
             });
           } else {
             console.warn('[fetchGoals] fetchProfile returned null/error, preserving local user goals');
@@ -260,20 +281,21 @@ export const useDiaryStore = create<DiaryStore>()(
                   ...state.goals,
                   ...currentLocal,
                 },
+                syncStatus: 'synced',
               }));
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error in fetchGoals store action (locking local user goals):', err);
           const currentLocal = getLocalGoalsCache();
-          if (currentLocal) {
-            set((state) => ({
-              goals: {
-                ...state.goals,
-                ...currentLocal,
-              },
-            }));
-          }
+          set((state) => ({
+            goals: {
+              ...state.goals,
+              ...(currentLocal || {}),
+            },
+            syncStatus: 'error',
+            syncErrorMessage: err?.message || 'Timeout/Offline',
+          }));
         } finally {
           set({ isLoadingGoals: false });
         }

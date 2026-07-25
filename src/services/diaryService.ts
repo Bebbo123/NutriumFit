@@ -1,4 +1,4 @@
-import { supabase, getValidatedUserId } from '../utils/supabaseClient';
+import { supabase, getValidatedUserId, withTimeout } from '../utils/supabaseClient';
 import type { DailyGoals, LoggedFood, MealType, FoodItem, Recipe, RecipeIngredient, SavedMeal, SavedMealItem } from '../types/diary';
 import { db } from '../utils/db';
 import { profileService } from './profileService';
@@ -41,7 +41,7 @@ export interface SupabaseFoodEntry {
 
 export const diaryService = {
   /**
-   * Fetches user profile goals from user_profiles or public.profiles
+   * Fetches user profile goals strictly from public.user_profiles
    */
   async fetchProfile(userId: string): Promise<DailyGoals | null> {
     if (!navigator.onLine) {
@@ -50,12 +50,18 @@ export const diaryService = {
     }
 
     try {
-      // Direct query strictly targeting user_profiles as single source of truth
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Direct query strictly targeting user_profiles with 5s timeout guard
+      const { data, error }: any = await withTimeout(
+        Promise.resolve(
+          supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle()
+        ),
+        5000,
+        'fetchProfile request timed out'
+      );
 
       if (error) {
         console.warn('fetchProfile error on user_profiles:', error);
@@ -147,13 +153,19 @@ export const diaryService = {
   async fetchOrCreateDailyLog(userId: string, date: string): Promise<SupabaseDailyLog | null> {
     try {
       if (!navigator.onLine) throw new Error('Offline');
-      // 1. Try to fetch
-      const { data: fetchData, error: fetchError } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .maybeSingle();
+      // 1. Try to fetch with 5s timeout guard
+      const { data: fetchData, error: fetchError }: any = await withTimeout(
+        Promise.resolve(
+          supabase
+            .from('daily_logs')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('date', date)
+            .maybeSingle()
+        ),
+        5000,
+        'fetchOrCreateDailyLog request timed out'
+      );
 
       if (fetchError) throw fetchError;
 
@@ -162,11 +174,17 @@ export const diaryService = {
       }
 
       // 2. Create if not exists
-      const { data: insertData, error: insertError } = await supabase
-        .from('daily_logs')
-        .insert({ user_id: userId, date })
-        .select()
-        .single();
+      const { data: insertData, error: insertError }: any = await withTimeout(
+        Promise.resolve(
+          supabase
+            .from('daily_logs')
+            .insert({ user_id: userId, date })
+            .select()
+            .single()
+        ),
+        5000,
+        'createDailyLog request timed out'
+      );
 
       if (insertError) {
         // In case of parallel inserts, check if it was created in the meantime
@@ -198,11 +216,17 @@ export const diaryService = {
   async fetchFoodEntries(dailyLogId: string): Promise<LoggedFood[]> {
     try {
       if (!navigator.onLine || dailyLogId.startsWith('offline_')) throw new Error('Offline');
-      const { data, error } = await supabase
-        .from('food_entries')
-        .select('*')
-        .eq('daily_log_id', dailyLogId)
-        .order('created_at', { ascending: true });
+      const { data, error }: any = await withTimeout(
+        Promise.resolve(
+          supabase
+            .from('food_entries')
+            .select('*')
+            .eq('daily_log_id', dailyLogId)
+            .order('created_at', { ascending: true })
+        ),
+        5000,
+        'fetchFoodEntries request timed out'
+      );
 
       if (error) throw error;
 

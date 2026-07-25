@@ -12,6 +12,7 @@ import { LiveWorkoutModal } from './components/workout/LiveWorkoutModal';
 import { RestTimerOverlay } from './components/workout/RestTimerOverlay';
 import { IosPwaPrompt } from './components/ui/IosPwaPrompt';
 import type { MealType } from './types/diary';
+import { supabase } from './utils/supabaseClient';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { useDiaryStore } from './store/diaryStore';
@@ -40,6 +41,26 @@ function AppContent() {
       fetchLogsForDate(user.id, selectedDate);
       fetchFavoriteFoods(user.id);
     }
+  }, [user, selectedDate, fetchGoals, fetchLogsForDate, fetchFavoriteFoods]);
+
+  // Automatic session refresh & re-sync on PWA resume (visibilitychange)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && user) {
+        console.log('[PWA Resume] App became visible. Refreshing session and syncing data...');
+        try {
+          await supabase.auth.getSession();
+          fetchGoals(user.id);
+          fetchLogsForDate(user.id, selectedDate);
+          fetchFavoriteFoods(user.id);
+        } catch (err) {
+          console.warn('[PWA Resume] Error refreshing session:', err);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user, selectedDate, fetchGoals, fetchLogsForDate, fetchFavoriteFoods]);
 
   // Online/offline status monitoring & sync trigger

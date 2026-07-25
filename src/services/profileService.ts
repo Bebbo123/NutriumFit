@@ -1,4 +1,4 @@
-import { supabase, getValidatedUserId } from '../utils/supabaseClient';
+import { supabase, getValidatedUserId, withTimeout } from '../utils/supabaseClient';
 import { diaryService } from './diaryService';
 import type { DailyGoals } from '../types/diary';
 
@@ -50,10 +50,16 @@ export const profileService = {
 
     console.log('[profileService] Saving goals to user_profiles:', payload);
 
-    let { data, error } = await supabase
-      .from('user_profiles')
-      .upsert(payload, { onConflict: 'id' })
-      .select();
+    let { data, error }: any = await withTimeout(
+      Promise.resolve(
+        supabase
+          .from('user_profiles')
+          .upsert(payload, { onConflict: 'id' })
+          .select()
+      ),
+      5000,
+      'updateUserProfileGoals request timed out'
+    );
 
     if (error) {
       const errText = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
