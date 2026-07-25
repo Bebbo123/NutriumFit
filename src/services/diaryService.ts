@@ -40,35 +40,62 @@ export interface SupabaseFoodEntry {
 
 export const diaryService = {
   /**
-   * Fetches user profile goals from public.profiles
+   * Fetches user profile goals from user_profiles or public.profiles
    */
   async fetchProfile(userId: string): Promise<DailyGoals | null> {
+    if (!navigator.onLine) return null;
+
     try {
-      if (!navigator.onLine) throw new Error('Offline');
-      const { data, error } = await supabase
-        .from('profiles')
+      let data: any = null;
+
+      // 1. Try user_profiles table first using maybeSingle()
+      const resUserProfiles = await supabase
+        .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (!resUserProfiles.error && resUserProfiles.data) {
+        data = resUserProfiles.data;
+      } else {
+        // 2. Fallback: try profiles table
+        const resProfiles = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
 
-      const profile = data as SupabaseProfile;
+        if (!resProfiles.error && resProfiles.data) {
+          data = resProfiles.data;
+        } else if (resProfiles.error && resUserProfiles.error) {
+          console.warn('Both user_profiles and profiles fetch returned notice/error:', resUserProfiles.error, resProfiles.error);
+        }
+      }
+
+      if (!data) return null;
+
+      const calories = Number(data.target_calories ?? data.daily_calorie_goal ?? 2200);
+      const carbs = Number(data.target_carbs_g ?? data.carb_goal ?? 250);
+      const fat = Number(data.target_fat_g ?? data.fat_goal ?? 70);
+      const protein = Number(data.target_protein_g ?? data.protein_goal ?? 150);
+      const waterMl = Number(data.target_water_ml ?? data.water_goal_ml ?? 2000);
+      const steps = Number(data.target_steps ?? data.steps_goal ?? 10000);
+
       return {
-        calories: profile.daily_calorie_goal || 2200,
-        carbs: profile.carb_goal || 250,
-        fat: profile.fat_goal || 70,
-        protein: profile.protein_goal || 150,
-        waterMl: profile.water_goal_ml || 2000,
-        steps: profile.steps_goal || 10000,
-        macroInputMode: (profile as any).macro_input_mode || 'grams',
-        currentWeight: profile.current_weight,
-        targetWeight: profile.target_weight,
-        weeklyGoal: profile.weekly_goal,
-        activityLevel: profile.activity_level,
-        age: profile.age,
-        gender: profile.gender,
-        height: profile.height,
+        calories: isNaN(calories) ? 2200 : calories,
+        carbs: isNaN(carbs) ? 250 : carbs,
+        fat: isNaN(fat) ? 70 : fat,
+        protein: isNaN(protein) ? 150 : protein,
+        waterMl: isNaN(waterMl) ? 2000 : waterMl,
+        steps: isNaN(steps) ? 10000 : steps,
+        macroInputMode: data.macro_input_mode || 'grams',
+        currentWeight: data.current_weight !== undefined && data.current_weight !== null ? Number(data.current_weight) : undefined,
+        targetWeight: data.target_weight !== undefined && data.target_weight !== null ? Number(data.target_weight) : undefined,
+        weeklyGoal: data.weekly_goal || undefined,
+        activityLevel: data.activity_level || undefined,
+        age: data.age !== undefined && data.age !== null ? Number(data.age) : undefined,
+        gender: data.gender || undefined,
+        height: data.height !== undefined && data.height !== null ? Number(data.height) : undefined,
       };
     } catch (err) {
       console.warn('fetchProfile falling back to default/persisted:', err);
@@ -77,34 +104,110 @@ export const diaryService = {
   },
 
   /**
-   * Updates user profile goals in public.profiles
+   * Performs explicit UPSERT to user_profiles / public.profiles table
    */
   async updateProfileGoals(userId: string, goals: Partial<DailyGoals>): Promise<boolean> {
     if (!navigator.onLine) {
       throw new Error('Offline');
     }
-    const updates: any = {};
-    if (goals.calories !== undefined) updates.daily_calorie_goal = goals.calories;
-    if (goals.carbs !== undefined) updates.carb_goal = goals.carbs;
-    if (goals.fat !== undefined) updates.fat_goal = goals.fat;
-    if (goals.protein !== undefined) updates.protein_goal = goals.protein;
-    if (goals.waterMl !== undefined) updates.water_goal_ml = goals.waterMl;
-    if (goals.steps !== undefined) updates.steps_goal = goals.steps;
-    if (goals.macroInputMode !== undefined) updates.macro_input_mode = goals.macroInputMode;
-    if (goals.currentWeight !== undefined) updates.current_weight = goals.currentWeight;
-    if (goals.targetWeight !== undefined) updates.target_weight = goals.targetWeight;
-    if (goals.weeklyGoal !== undefined) updates.weekly_goal = goals.weeklyGoal;
-    if (goals.activityLevel !== undefined) updates.activity_level = goals.activityLevel;
-    if (goals.age !== undefined) updates.age = goals.age;
-    if (goals.gender !== undefined) updates.gender = goals.gender;
-    if (goals.height !== undefined) updates.height = goals.height;
 
-    const { error } = await supabase
+    // Build payload compatible with both naming schemes (user_profiles & profiles)
+    const upsertPayload: any = {
+      id: userId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (goals.calories !== undefined) {
+      upsertPayload.daily_calorie_goal = goals.calories;
+      upsertPayload.target_calories = goals.calories;
+    }
+    if (goals.carbs !== undefined) {
+      upsertPayload.carb_goal = goals.carbs;
+      upsertPayload.target_carbs_g = goals.carbs;
+    }
+    if (goals.fat !== undefined) {
+      upsertPayload.fat_goal = goals.fat;
+      upsertPayload.target_fat_g = goals.fat;
+    }
+    if (goals.protein !== undefined) {
+      upsertPayload.protein_goal = goals.protein;
+      upsertPayload.target_protein_g = goals.protein;
+    }
+    if (goals.waterMl !== undefined) {
+      upsertPayload.water_goal_ml = goals.waterMl;
+      upsertPayload.target_water_ml = goals.waterMl;
+    }
+    if (goals.steps !== undefined) {
+      upsertPayload.steps_goal = goals.steps;
+      upsertPayload.target_steps = goals.steps;
+    }
+    if (goals.macroInputMode !== undefined) {
+      upsertPayload.macro_input_mode = goals.macroInputMode;
+    }
+    if (goals.currentWeight !== undefined) upsertPayload.current_weight = goals.currentWeight;
+    if (goals.targetWeight !== undefined) upsertPayload.target_weight = goals.targetWeight;
+    if (goals.weeklyGoal !== undefined) upsertPayload.weekly_goal = goals.weeklyGoal;
+    if (goals.activityLevel !== undefined) upsertPayload.activity_level = goals.activityLevel;
+    if (goals.age !== undefined) upsertPayload.age = goals.age;
+    if (goals.gender !== undefined) upsertPayload.gender = goals.gender;
+    if (goals.height !== undefined) upsertPayload.height = goals.height;
+
+    // 1. Try UPSERT into user_profiles
+    const userProfilesRes = await supabase
+      .from('user_profiles')
+      .upsert(upsertPayload, { onConflict: 'id' });
+
+    if (!userProfilesRes.error) {
+      return true;
+    }
+
+    console.warn('UPSERT into user_profiles encountered notice/error, attempting profiles table:', userProfilesRes.error);
+
+    // 2. Try UPSERT into profiles table
+    const profilesRes = await supabase
       .from('profiles')
-      .update(updates)
-      .eq('id', userId);
+      .upsert(upsertPayload, { onConflict: 'id' });
 
-    if (error) throw error;
+    if (!profilesRes.error) {
+      return true;
+    }
+
+    // 3. If profiles upsert failed due to unknown columns, sanitize payload to standard profiles columns
+    console.warn('Full upsert to profiles failed:', profilesRes.error, 'Attempting sanitized profiles upsert...');
+
+    const sanitizedProfilesPayload: any = {
+      id: userId,
+      daily_calorie_goal: goals.calories,
+      carb_goal: goals.carbs,
+      fat_goal: goals.fat,
+      protein_goal: goals.protein,
+      water_goal_ml: goals.waterMl,
+      steps_goal: goals.steps,
+      macro_input_mode: goals.macroInputMode,
+      current_weight: goals.currentWeight,
+      target_weight: goals.targetWeight,
+      weekly_goal: goals.weeklyGoal,
+      activity_level: goals.activityLevel,
+      age: goals.age,
+      gender: goals.gender,
+      height: goals.height,
+    };
+
+    Object.keys(sanitizedProfilesPayload).forEach((key) => {
+      if (sanitizedProfilesPayload[key] === undefined) {
+        delete sanitizedProfilesPayload[key];
+      }
+    });
+
+    const fallbackRes = await supabase
+      .from('profiles')
+      .upsert(sanitizedProfilesPayload, { onConflict: 'id' });
+
+    if (fallbackRes.error) {
+      console.error('CRITICAL: Error saving user profile goals to Supabase PostgreSQL:', fallbackRes.error);
+      throw new Error(fallbackRes.error.message || 'Errore durante il salvataggio degli obiettivi');
+    }
+
     return true;
   },
 

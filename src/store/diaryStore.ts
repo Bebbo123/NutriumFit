@@ -423,23 +423,21 @@ export const useDiaryStore = create<DiaryStore>()(
 
       updateGoals: async (userId, newGoals) => {
         set({ isLoadingGoals: true });
-        // Optimistically apply goals immediately
-        set((state) => ({
-          goals: {
-            ...state.goals,
-            ...newGoals,
-          },
-        }));
+        const mergedGoals = { ...get().goals, ...newGoals };
+
+        // Optimistically apply goals immediately to local Zustand state & persistent storage
+        set({ goals: mergedGoals });
 
         try {
-          await diaryService.updateProfileGoals(userId, newGoals);
-        } catch (err) {
-          console.warn('Error saving profile goals to Supabase, queuing for offline sync:', err);
+          await diaryService.updateProfileGoals(userId, mergedGoals);
+        } catch (err: any) {
+          console.error('Error saving profile goals to Supabase:', err);
           await db.offlineQueue.add({
             action: 'updateGoals',
-            payload: { userId, newGoals },
+            payload: { userId, newGoals: mergedGoals },
             timestamp: Date.now(),
           });
+          throw err;
         } finally {
           set({ isLoadingGoals: false });
         }

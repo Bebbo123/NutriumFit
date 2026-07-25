@@ -214,8 +214,14 @@ export const GoalsPage: React.FC = () => {
       height: calcMode === 'auto' ? height : undefined,
     };
 
-    await updateGoals(user.id, newGoals);
-    setIsEditing(false);
+    try {
+      await updateGoals(user.id, newGoals);
+      setIsEditing(false);
+    } catch (err: any) {
+      console.error('Errore durante il salvataggio degli obiettivi:', err);
+      alert('Errore durante il salvataggio degli obiettivi su Supabase. Gli obiettivi sono stati salvati in locale e verranno sincronizzati appena possibile.');
+      setIsEditing(false);
+    }
   };
 
   // Filter weight logs for graph
