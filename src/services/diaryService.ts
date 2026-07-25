@@ -45,76 +45,52 @@ export const diaryService = {
    */
   async fetchProfile(userId: string): Promise<DailyGoals | null> {
     if (!navigator.onLine) {
-      console.warn('FALLBACK APPLIED BECAUSE: navigator is offline during fetchProfile');
+      console.warn('fetchProfile skipped: device is offline');
       return null;
     }
 
     try {
-      let data: any = null;
-      let lastError: any = null;
-
-      // 1. Try user_profiles table first using maybeSingle()
-      const resUserProfiles = await supabase
+      // Direct query strictly targeting user_profiles as single source of truth
+      const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
 
-      if (!resUserProfiles.error && resUserProfiles.data) {
-        data = resUserProfiles.data;
-      } else {
-        lastError = resUserProfiles.error;
-        // 2. Fallback: try profiles table
-        const resProfiles = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (!resProfiles.error && resProfiles.data) {
-          data = resProfiles.data;
-        } else {
-          lastError = resProfiles.error || lastError;
-        }
-      }
-
-      if (!data) {
-        console.warn('FALLBACK APPLIED BECAUSE:', lastError || 'data is empty / profile row missing in Supabase');
+      if (error) {
+        console.warn('fetchProfile error on user_profiles:', error);
         return null;
       }
 
-      console.log('SUPABASE RAW PROFILE:', data);
+      if (!data) {
+        console.log('No user_profiles record found for user:', userId);
+        return null;
+      }
+
+      console.log('SUPABASE RAW USER_PROFILE:', data);
 
       const calories = data.target_calories !== undefined && data.target_calories !== null
         ? Number(data.target_calories)
         : data.daily_calorie_goal !== undefined && data.daily_calorie_goal !== null
         ? Number(data.daily_calorie_goal)
-        : data.calories !== undefined && data.calories !== null
-        ? Number(data.calories)
         : null;
 
       const carbs = data.target_carbs_g !== undefined && data.target_carbs_g !== null
         ? Number(data.target_carbs_g)
         : data.carb_goal !== undefined && data.carb_goal !== null
         ? Number(data.carb_goal)
-        : data.carbs !== undefined && data.carbs !== null
-        ? Number(data.carbs)
         : null;
 
       const fat = data.target_fat_g !== undefined && data.target_fat_g !== null
         ? Number(data.target_fat_g)
         : data.fat_goal !== undefined && data.fat_goal !== null
         ? Number(data.fat_goal)
-        : data.fat !== undefined && data.fat !== null
-        ? Number(data.fat)
         : null;
 
       const protein = data.target_protein_g !== undefined && data.target_protein_g !== null
         ? Number(data.target_protein_g)
         : data.protein_goal !== undefined && data.protein_goal !== null
         ? Number(data.protein_goal)
-        : data.protein !== undefined && data.protein !== null
-        ? Number(data.protein)
         : null;
 
       const waterMl = data.target_water_ml !== undefined && data.target_water_ml !== null
@@ -130,7 +106,6 @@ export const diaryService = {
         : null;
 
       if (calories === null && carbs === null && fat === null && protein === null) {
-        console.warn('FALLBACK APPLIED BECAUSE: data is empty / goal properties are missing');
         return null;
       }
 
@@ -151,10 +126,10 @@ export const diaryService = {
         height: data.height !== undefined && data.height !== null ? Number(data.height) : undefined,
       };
 
-      console.log('PARSED GOALS FROM SUPABASE:', result);
+      console.log('PARSED USER_PROFILE GOALS:', result);
       return result;
     } catch (err) {
-      console.warn('FALLBACK APPLIED BECAUSE:', err);
+      console.warn('fetchProfile error:', err);
       return null;
     }
   },
