@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabaseClient';
 import type { DailyGoals, LoggedFood, MealType, FoodItem, Recipe, RecipeIngredient, SavedMeal, SavedMealItem } from '../types/diary';
 import { db } from '../utils/db';
+import { profileService } from './profileService';
 
 export interface SupabaseProfile {
   id: string;
@@ -159,143 +160,10 @@ export const diaryService = {
   },
 
   /**
-   * Performs explicit UPSERT to user_profiles / public.profiles table
+   * Performs explicit UPSERT to profiles / user_profiles table via profileService
    */
   async updateProfileGoals(userId: string, goals: Partial<DailyGoals>): Promise<boolean> {
-    if (!navigator.onLine) {
-      console.warn('FALLBACK APPLIED BECAUSE: navigator is offline during updateProfileGoals');
-      const err: any = new Error('Dispositivo offline');
-      err.code = 'OFFLINE';
-      throw err;
-    }
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      const err: any = new Error("Utente non autenticato. Effettua il login per salvare gli obiettivi");
-      err.code = 'UNAUTHENTICATED';
-      throw err;
-    }
-
-    const activeUserId = authData.user.id || userId;
-
-    // Build payload compatible with both naming schemes (user_profiles & profiles)
-    const upsertPayload: any = {
-      id: activeUserId,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (goals.calories !== undefined) {
-      upsertPayload.daily_calorie_goal = goals.calories;
-      upsertPayload.target_calories = goals.calories;
-      upsertPayload.calories = goals.calories;
-    }
-    if (goals.carbs !== undefined) {
-      upsertPayload.carb_goal = goals.carbs;
-      upsertPayload.target_carbs_g = goals.carbs;
-      upsertPayload.carbs = goals.carbs;
-    }
-    if (goals.fat !== undefined) {
-      upsertPayload.fat_goal = goals.fat;
-      upsertPayload.target_fat_g = goals.fat;
-      upsertPayload.fat = goals.fat;
-    }
-    if (goals.protein !== undefined) {
-      upsertPayload.protein_goal = goals.protein;
-      upsertPayload.target_protein_g = goals.protein;
-      upsertPayload.protein = goals.protein;
-    }
-    if (goals.waterMl !== undefined) {
-      upsertPayload.water_goal_ml = goals.waterMl;
-      upsertPayload.target_water_ml = goals.waterMl;
-    }
-    if (goals.steps !== undefined) {
-      upsertPayload.steps_goal = goals.steps;
-      upsertPayload.target_steps = goals.steps;
-    }
-    if (goals.macroInputMode !== undefined) {
-      upsertPayload.macro_input_mode = goals.macroInputMode;
-    }
-    if (goals.currentWeight !== undefined) upsertPayload.current_weight = goals.currentWeight;
-    if (goals.targetWeight !== undefined) upsertPayload.target_weight = goals.targetWeight;
-    if (goals.weeklyGoal !== undefined) upsertPayload.weekly_goal = goals.weeklyGoal;
-    if (goals.activityLevel !== undefined) upsertPayload.activity_level = goals.activityLevel;
-    if (goals.age !== undefined) upsertPayload.age = goals.age;
-    if (goals.gender !== undefined) upsertPayload.gender = goals.gender;
-    if (goals.height !== undefined) upsertPayload.height = goals.height;
-
-    console.log('[updateProfileGoals] Attempting UPSERT to user_profiles with payload:', upsertPayload);
-
-    let lastError: any = null;
-
-    // 1. Try UPSERT into user_profiles
-    const userProfilesRes = await supabase
-      .from('user_profiles')
-      .upsert(upsertPayload, { onConflict: 'id' });
-
-    if (!userProfilesRes.error) {
-      console.log('[updateProfileGoals] UPSERT into user_profiles succeeded!');
-      return true;
-    }
-
-    lastError = userProfilesRes.error;
-    console.warn('UPSERT into user_profiles encountered notice/error, attempting profiles table:', lastError);
-
-    // 2. Try UPSERT into profiles table
-    const profilesRes = await supabase
-      .from('profiles')
-      .upsert(upsertPayload, { onConflict: 'id' });
-
-    if (!profilesRes.error) {
-      console.log('[updateProfileGoals] UPSERT into profiles succeeded!');
-      return true;
-    }
-
-    lastError = profilesRes.error;
-    console.warn('Full upsert to profiles failed:', lastError, 'Attempting sanitized profiles upsert...');
-
-    // 3. If profiles upsert failed due to unknown columns, sanitize payload to standard profiles columns
-    const sanitizedProfilesPayload: any = {
-      id: activeUserId,
-      daily_calorie_goal: goals.calories,
-      carb_goal: goals.carbs,
-      fat_goal: goals.fat,
-      protein_goal: goals.protein,
-      water_goal_ml: goals.waterMl,
-      steps_goal: goals.steps,
-      macro_input_mode: goals.macroInputMode,
-      current_weight: goals.currentWeight,
-      target_weight: goals.targetWeight,
-      weekly_goal: goals.weeklyGoal,
-      activity_level: goals.activityLevel,
-      age: goals.age,
-      gender: goals.gender,
-      height: goals.height,
-    };
-
-    Object.keys(sanitizedProfilesPayload).forEach((key) => {
-      if (sanitizedProfilesPayload[key] === undefined) {
-        delete sanitizedProfilesPayload[key];
-      }
-    });
-
-    const fallbackRes = await supabase
-      .from('profiles')
-      .upsert(sanitizedProfilesPayload, { onConflict: 'id' });
-
-    if (!fallbackRes.error) {
-      console.log('[updateProfileGoals] Sanitized UPSERT into profiles succeeded!');
-      return true;
-    }
-
-    lastError = fallbackRes.error || lastError;
-    console.error('CRITICAL: Error saving user profile goals to Supabase PostgreSQL:', lastError);
-
-    const errorMsg = lastError?.message || 'Errore durante il salvataggio degli obiettivi';
-    const errObj: any = new Error(errorMsg);
-    errObj.code = lastError?.code;
-    errObj.details = lastError?.details;
-    errObj.hint = lastError?.hint;
-    throw errObj;
+    return profileService.updateUserProfileGoals(userId, goals);
   },
 
   /**

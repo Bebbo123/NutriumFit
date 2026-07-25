@@ -8,6 +8,7 @@ import {
   Calculator,
   User,
   HelpCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { useDiaryStore } from '../store/diaryStore';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,14 @@ export const GoalsPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'goals' | 'analytics'>('goals');
   const [isEditing, setIsEditing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
 
   // Form states
   const [calcMode, setCalcMode] = useState<'auto' | 'manual'>('manual');
@@ -220,6 +229,7 @@ export const GoalsPage: React.FC = () => {
     try {
       await updateGoals(user.id, newGoals);
       setIsEditing(false);
+      showToast('Obiettivi salvati e sincronizzati con successo!', 'success');
     } catch (err: any) {
       console.error('Errore durante il salvataggio degli obiettivi:', err);
 
@@ -236,6 +246,7 @@ export const GoalsPage: React.FC = () => {
         errorMsg = `Errore Supabase: ${message}${code ? ` (Codice: ${code})` : ''}${details ? `\nDettagli: ${details}` : ''}`;
       }
 
+      showToast('Obiettivi salvati in locale e in attesa di sincronizzazione', 'info');
       alert(`${errorMsg}\n\nGli obiettivi sono stati salvati in locale e verranno sincronizzati appena possibile.`);
       setIsEditing(false);
     }
@@ -1260,6 +1271,22 @@ export const GoalsPage: React.FC = () => {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Success / Notification Toast */}
+      {toast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-md ${
+            toast.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-300'
+              : toast.type === 'error'
+              ? 'bg-red-950/90 border-red-500/30 text-red-300'
+              : 'bg-slate-800/90 border-slate-700 text-slate-200'
+          }`}>
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="text-xs font-bold font-sans tracking-wide">{toast.message}</span>
           </div>
         </div>
       )}
