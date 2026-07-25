@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { supabase } from '../utils/supabaseClient';
 import type { DailyGoals, LoggedFood, MealType, FoodItem, Macros, Recipe, RecipeIngredient, SavedMeal, SavedMealItem } from '../types/diary';
 import { diaryService } from '../services/diaryService';
 import { profileService } from '../services/profileService';
@@ -214,7 +215,11 @@ export const useDiaryStore = create<DiaryStore>()(
       fetchGoals: async (userId) => {
         set({ isLoadingGoals: true });
         
-        // 1. Local-Storage First Rehydration Guard: load local custom goals first as baseline
+        // Ensure active auth session check before fetch
+        const { data: { session } } = await supabase.auth.getSession();
+        const activeUserId = session?.user?.id || userId;
+
+        // 1. Load local custom goals first as baseline
         const localGoals = getLocalGoalsCache();
         if (localGoals) {
           set((state) => ({
@@ -227,17 +232,17 @@ export const useDiaryStore = create<DiaryStore>()(
         }
 
         try {
-          const dbGoals = await profileService.fetchUserProfile(userId);
+          const dbGoals = await profileService.fetchUserProfile(activeUserId);
           if (dbGoals) {
             console.log('[fetchGoals] Fetched DB goals from Supabase:', dbGoals);
             
             set((state) => {
               const currentLocal = getLocalGoalsCache() || state.goals;
-              // Keep and lock local user goals as priority so they persist even if Supabase sync fails or has missing fields
+              // Remote cloud goals take top priority so PC and Mobile align instantly
               const finalGoals: DailyGoals = {
                 ...DEFAULT_GOALS,
-                ...dbGoals,
                 ...(currentLocal || {}),
+                ...dbGoals,
               };
 
               try {
@@ -277,15 +282,18 @@ export const useDiaryStore = create<DiaryStore>()(
       fetchLogsForDate: async (userId, date) => {
         set({ isLoadingLogs: true });
         try {
-          const dailyLog = await diaryService.fetchOrCreateDailyLog(userId, date);
+          const { data: { session } } = await supabase.auth.getSession();
+          const activeUserId = session?.user?.id || userId;
+
+          const dailyLog = await diaryService.fetchOrCreateDailyLog(activeUserId, date);
           let entries: LoggedFood[] = [];
           if (dailyLog) {
             entries = await diaryService.fetchFoodEntries(dailyLog.id);
           }
-          const dbWater = await diaryService.fetchWaterIntake(userId, date);
+          const dbWater = await diaryService.fetchWaterIntake(activeUserId, date);
 
           if (navigator.onLine && dailyLog && !dailyLog.id.startsWith('offline_')) {
-            await db.logs.where({ userId, date }).delete();
+            await db.logs.where({ userId: activeUserId, date }).delete();
             for (const entry of entries) {
               const sCount = entry.servings || 1;
               const mockFoodItem = {
@@ -300,7 +308,7 @@ export const useDiaryStore = create<DiaryStore>()(
               };
               await db.logs.put({
                 logId: entry.logId,
-                userId,
+                userId: activeUserId,
                 date,
                 foodItemJson: JSON.stringify(mockFoodItem),
                 mealType: entry.mealType,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BottomNav } from './components/navigation/BottomNav';
 import type { NavTab } from './components/navigation/BottomNav';
+import { CloudSyncBadge } from './components/navigation/CloudSyncBadge';
 import { HomePage } from './pages/HomePage';
 import { DiaryPage } from './pages/DiaryPage';
 import { AddFoodPage } from './pages/AddFoodPage';
@@ -181,6 +182,11 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-white">
+      {/* Top Header Cloud Sync Status Indicator */}
+      <div className="fixed top-3 right-3 z-40 pointer-events-auto">
+        <CloudSyncBadge />
+      </div>
+
       {/* View Container */}
       <main className="min-h-screen">
         {activeTab === 'home' && (
