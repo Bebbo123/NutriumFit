@@ -2,10 +2,33 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DailyGoals, LoggedFood, MealType, FoodItem, Macros, Recipe, RecipeIngredient, SavedMeal, SavedMealItem } from '../types/diary';
 import { diaryService } from '../services/diaryService';
+import { profileService } from '../services/profileService';
 import { workoutService } from '../services/workoutService';
 import { db } from '../utils/db';
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
+
+const getLocalGoalsCache = (): DailyGoals | null => {
+  try {
+    const cacheRaw = localStorage.getItem('user_goals_cache');
+    if (cacheRaw) {
+      const parsed = JSON.parse(cacheRaw);
+      if (parsed && typeof parsed.calories === 'number' && parsed.calories > 0) {
+        return parsed as DailyGoals;
+      }
+    }
+    const diaryStorageRaw = localStorage.getItem('nutriumfit-diary-storage');
+    if (diaryStorageRaw) {
+      const parsed = JSON.parse(diaryStorageRaw);
+      if (parsed?.state?.goals && typeof parsed.state.goals.calories === 'number' && parsed.state.goals.calories > 0) {
+        return parsed.state.goals as DailyGoals;
+      }
+    }
+  } catch (e) {
+    console.warn('[getLocalGoalsCache] Error parsing local goals cache:', e);
+  }
+  return null;
+};
 
 interface DiaryStore {
   selectedDate: string;
@@ -176,7 +199,7 @@ export const useDiaryStore = create<DiaryStore>()(
               await diaryService.deleteWeightLog(userId, date);
             } else if (item.action === 'updateGoals') {
               const { userId, newGoals } = item.payload;
-              await diaryService.updateProfileGoals(userId, newGoals);
+              await profileService.updateUserProfileGoals(userId, newGoals);
             }
 
             if (item.id !== undefined) {
@@ -190,39 +213,62 @@ export const useDiaryStore = create<DiaryStore>()(
 
       fetchGoals: async (userId) => {
         set({ isLoadingGoals: true });
+        
+        // 1. Local-Storage First Rehydration Guard: load local custom goals first as baseline
+        const localGoals = getLocalGoalsCache();
+        if (localGoals) {
+          set((state) => ({
+            goals: {
+              ...DEFAULT_GOALS,
+              ...state.goals,
+              ...localGoals,
+            },
+          }));
+        }
+
         try {
-          const dbGoals = await diaryService.fetchProfile(userId);
+          const dbGoals = await profileService.fetchUserProfile(userId);
           if (dbGoals) {
-            console.log('[fetchGoals] Applying fetched DB goals to Zustand store & localStorage:', dbGoals);
+            console.log('[fetchGoals] Fetched DB goals from Supabase:', dbGoals);
             
-            // Hard-lock rehydration: ONLY set target numbers after fetchProfile returns valid data
+            set((state) => {
+              const currentLocal = getLocalGoalsCache() || state.goals;
+              // Keep and lock local user goals as priority so they persist even if Supabase sync fails or has missing fields
+              const finalGoals: DailyGoals = {
+                ...DEFAULT_GOALS,
+                ...dbGoals,
+                ...(currentLocal || {}),
+              };
+
+              try {
+                localStorage.setItem('user_goals_cache', JSON.stringify(finalGoals));
+              } catch (e) {}
+
+              return { goals: finalGoals };
+            });
+          } else {
+            console.warn('[fetchGoals] fetchProfile returned null/error, preserving local user goals');
+            const currentLocal = getLocalGoalsCache();
+            if (currentLocal) {
+              set((state) => ({
+                goals: {
+                  ...state.goals,
+                  ...currentLocal,
+                },
+              }));
+            }
+          }
+        } catch (err) {
+          console.error('Error in fetchGoals store action (locking local user goals):', err);
+          const currentLocal = getLocalGoalsCache();
+          if (currentLocal) {
             set((state) => ({
               goals: {
                 ...state.goals,
-                ...dbGoals,
+                ...currentLocal,
               },
             }));
-
-            // Sync Zustand persistent storage in localStorage directly
-            try {
-              const currentStorageRaw = localStorage.getItem('nutriumfit-diary-storage');
-              if (currentStorageRaw) {
-                const parsed = JSON.parse(currentStorageRaw);
-                parsed.state = parsed.state || {};
-                parsed.state.goals = {
-                  ...parsed.state.goals,
-                  ...dbGoals,
-                };
-                localStorage.setItem('nutriumfit-diary-storage', JSON.stringify(parsed));
-              }
-            } catch (storageErr) {
-              console.warn('[fetchGoals] Error syncing to localStorage:', storageErr);
-            }
-          } else {
-            console.warn('[fetchGoals] fetchProfile returned null, preserving existing state/local storage goals');
           }
-        } catch (err) {
-          console.error('Error in fetchGoals store action:', err);
         } finally {
           set({ isLoadingGoals: false });
         }
@@ -449,8 +495,15 @@ export const useDiaryStore = create<DiaryStore>()(
         // Optimistically apply goals immediately to local Zustand state & persistent storage
         set({ goals: mergedGoals });
 
+        // Save immediately to local user_goals_cache to prevent default reversion
         try {
-          await diaryService.updateProfileGoals(userId, mergedGoals);
+          localStorage.setItem('user_goals_cache', JSON.stringify(mergedGoals));
+        } catch (e) {
+          console.warn('[updateGoals] Error caching goals to user_goals_cache:', e);
+        }
+
+        try {
+          await profileService.updateUserProfileGoals(userId, mergedGoals);
         } catch (err: any) {
           console.error('Error saving profile goals to Supabase:', err);
           await db.offlineQueue.add({

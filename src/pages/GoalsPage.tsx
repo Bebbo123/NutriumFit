@@ -185,7 +185,10 @@ export const GoalsPage: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      alert('Utente non autenticato. Effettua il login per salvare gli obiettivi');
+      return;
+    }
 
     if (macroInputMode === 'percentages' && totalPercentage !== 100) {
       alert('La somma delle percentuali dei macronutrienti deve essere esattamente 100%.');
@@ -219,7 +222,21 @@ export const GoalsPage: React.FC = () => {
       setIsEditing(false);
     } catch (err: any) {
       console.error('Errore durante il salvataggio degli obiettivi:', err);
-      alert('Errore durante il salvataggio degli obiettivi su Supabase. Gli obiettivi sono stati salvati in locale e verranno sincronizzati appena possibile.');
+
+      const message = err?.message || 'Errore durante il salvataggio degli obiettivi';
+      const code = err?.code;
+      const details = err?.details;
+
+      let errorMsg = '';
+      if (message.includes('Utente non autenticato')) {
+        errorMsg = 'Utente non autenticato. Effettua il login per salvare gli obiettivi';
+      } else if (message.startsWith('Errore Supabase:')) {
+        errorMsg = `${message}${code ? ` (Codice: ${code})` : ''}${details ? `\nDettagli: ${details}` : ''}`;
+      } else {
+        errorMsg = `Errore Supabase: ${message}${code ? ` (Codice: ${code})` : ''}${details ? `\nDettagli: ${details}` : ''}`;
+      }
+
+      alert(`${errorMsg}\n\nGli obiettivi sono stati salvati in locale e verranno sincronizzati appena possibile.`);
       setIsEditing(false);
     }
   };
@@ -242,7 +259,7 @@ export const GoalsPage: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 pt-safe px-4 max-w-md mx-auto relative">
+    <div className="pb-24 pt-10 pt-[env(safe-area-inset-top,2rem)] px-4 max-w-md mx-auto relative">
       {/* Tab Selector */}
       <div className="flex bg-slate-900/90 border border-slate-800 rounded-2xl p-1 mb-5 shadow-sm">
         <button

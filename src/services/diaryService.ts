@@ -164,12 +164,23 @@ export const diaryService = {
   async updateProfileGoals(userId: string, goals: Partial<DailyGoals>): Promise<boolean> {
     if (!navigator.onLine) {
       console.warn('FALLBACK APPLIED BECAUSE: navigator is offline during updateProfileGoals');
-      throw new Error('Offline');
+      const err: any = new Error('Dispositivo offline');
+      err.code = 'OFFLINE';
+      throw err;
     }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) {
+      const err: any = new Error("Utente non autenticato. Effettua il login per salvare gli obiettivi");
+      err.code = 'UNAUTHENTICATED';
+      throw err;
+    }
+
+    const activeUserId = authData.user.id || userId;
 
     // Build payload compatible with both naming schemes (user_profiles & profiles)
     const upsertPayload: any = {
-      id: userId,
+      id: activeUserId,
       updated_at: new Date().toISOString(),
     };
 
@@ -214,6 +225,8 @@ export const diaryService = {
 
     console.log('[updateProfileGoals] Attempting UPSERT to user_profiles with payload:', upsertPayload);
 
+    let lastError: any = null;
+
     // 1. Try UPSERT into user_profiles
     const userProfilesRes = await supabase
       .from('user_profiles')
@@ -224,7 +237,8 @@ export const diaryService = {
       return true;
     }
 
-    console.warn('UPSERT into user_profiles encountered notice/error, attempting profiles table:', userProfilesRes.error);
+    lastError = userProfilesRes.error;
+    console.warn('UPSERT into user_profiles encountered notice/error, attempting profiles table:', lastError);
 
     // 2. Try UPSERT into profiles table
     const profilesRes = await supabase
@@ -236,11 +250,12 @@ export const diaryService = {
       return true;
     }
 
-    // 3. If profiles upsert failed due to unknown columns, sanitize payload to standard profiles columns
-    console.warn('Full upsert to profiles failed:', profilesRes.error, 'Attempting sanitized profiles upsert...');
+    lastError = profilesRes.error;
+    console.warn('Full upsert to profiles failed:', lastError, 'Attempting sanitized profiles upsert...');
 
+    // 3. If profiles upsert failed due to unknown columns, sanitize payload to standard profiles columns
     const sanitizedProfilesPayload: any = {
-      id: userId,
+      id: activeUserId,
       daily_calorie_goal: goals.calories,
       carb_goal: goals.carbs,
       fat_goal: goals.fat,
@@ -267,12 +282,20 @@ export const diaryService = {
       .from('profiles')
       .upsert(sanitizedProfilesPayload, { onConflict: 'id' });
 
-    if (fallbackRes.error) {
-      console.error('CRITICAL: Error saving user profile goals to Supabase PostgreSQL:', fallbackRes.error);
-      throw new Error(fallbackRes.error.message || 'Errore durante il salvataggio degli obiettivi');
+    if (!fallbackRes.error) {
+      console.log('[updateProfileGoals] Sanitized UPSERT into profiles succeeded!');
+      return true;
     }
 
-    return true;
+    lastError = fallbackRes.error || lastError;
+    console.error('CRITICAL: Error saving user profile goals to Supabase PostgreSQL:', lastError);
+
+    const errorMsg = lastError?.message || 'Errore durante il salvataggio degli obiettivi';
+    const errObj: any = new Error(errorMsg);
+    errObj.code = lastError?.code;
+    errObj.details = lastError?.details;
+    errObj.hint = lastError?.hint;
+    throw errObj;
   },
 
   /**
