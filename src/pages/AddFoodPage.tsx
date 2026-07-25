@@ -652,14 +652,14 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     return (
       <div className="pb-24 pt-safe-modal px-4 max-w-md mx-auto min-h-screen bg-slate-950 font-sans text-slate-100">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 pt-3 shrink-0">
           <button
             type="button"
             onClick={() => setShowRecipeBuilder(false)}
-            className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white cursor-pointer transition-colors active:scale-95 shadow-md shrink-0"
+            className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white cursor-pointer transition-colors active:scale-95 shadow-md shrink-0"
             title="Torna indietro"
           >
-            <ArrowLeft className="w-5 h-5 text-cyan-400" />
+            <ArrowLeft className="w-6 h-6 text-cyan-400" />
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-extrabold text-white">Crea Nuova Ricetta</h1>
@@ -879,14 +879,14 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   return (
     <div className="pb-24 pt-safe-modal px-4 max-w-md mx-auto min-h-screen bg-slate-950 font-sans text-slate-100">
       {/* Top Header */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-4 pt-3 shrink-0">
         <button
           type="button"
           onClick={onBack}
-          className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white cursor-pointer transition-colors active:scale-95 shadow-md shrink-0"
+          className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white cursor-pointer transition-colors active:scale-95 shadow-md shrink-0"
           title="Torna indietro"
         >
-          <ArrowLeft className="w-5 h-5 text-cyan-400" />
+          <ArrowLeft className="w-6 h-6 text-cyan-400" />
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-extrabold text-white">Aggiungi Alimento</h1>
