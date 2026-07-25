@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabaseClient';
+import { supabase, getValidatedUserId } from '../utils/supabaseClient';
 import { diaryService } from './diaryService';
 import type { DailyGoals } from '../types/diary';
 
@@ -26,7 +26,7 @@ async function executeResilientUpsert(
   for (let attempt = 0; attempt < 15; attempt++) {
     const res = await supabase.from(table).upsert(currentPayload, { onConflict: 'id' });
     if (!res.error) {
-      console.log(`[executeResilientUpsert] Successfully saved to ${table} on attempt ${attempt + 1}:`, currentPayload);
+      console.log(`[SUPABASE SYNC OK] ${table}:`, currentPayload);
       return { success: true, data: res.data };
     }
 
@@ -50,7 +50,7 @@ async function executeResilientUpsert(
 
     const updateRes = await supabase.from(table).update(currentPayload).eq('id', currentPayload.id);
     if (!updateRes.error) {
-      console.log(`[executeResilientUpsert] Successfully updated ${table}:`, currentPayload);
+      console.log(`[SUPABASE SYNC OK] ${table} (update):`, currentPayload);
       return { success: true, data: updateRes.data };
     }
 
@@ -90,14 +90,7 @@ export const profileService = {
       throw err;
     }
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      const err: any = new Error("Utente non autenticato. Effettua il login per salvare gli obiettivi");
-      err.code = 'UNAUTHENTICATED';
-      throw err;
-    }
-
-    const activeUserId = authData.user.id || userId;
+    const activeUserId = (await getValidatedUserId()) || userId;
     const nowIso = new Date().toISOString();
 
     // 1. CLEAN UNIFIED PRIMARY PAYLOAD (Standard normalized target_* column names ONLY - NO alias keys)

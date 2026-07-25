@@ -24,6 +24,7 @@ function AppContent() {
     selectedDate,
     fetchGoals,
     fetchLogsForDate,
+    fetchFavoriteFoods,
     setIsOffline,
     syncOfflineQueue,
     setDeferredPrompt
@@ -31,13 +32,15 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [targetMealType, setTargetMealType] = useState<MealType>('Colazione');
 
-  // Trigger data sync on user auth or date changes
+  // Trigger full cloud data sync on user auth or date changes
   useEffect(() => {
     if (user) {
+      console.log('[AppContent] Triggering on-demand cloud pull for user:', user.id);
       fetchGoals(user.id);
       fetchLogsForDate(user.id, selectedDate);
+      fetchFavoriteFoods(user.id);
     }
-  }, [user, selectedDate, fetchGoals, fetchLogsForDate]);
+  }, [user, selectedDate, fetchGoals, fetchLogsForDate, fetchFavoriteFoods]);
 
   // Online/offline status monitoring & sync trigger
   useEffect(() => {
@@ -48,6 +51,7 @@ function AppContent() {
           // Re-fetch database resources after sync
           fetchGoals(user.id);
           fetchLogsForDate(user.id, selectedDate);
+          fetchFavoriteFoods(user.id);
         });
       }
     };
@@ -64,6 +68,7 @@ function AppContent() {
       syncOfflineQueue().then(() => {
         fetchGoals(user.id);
         fetchLogsForDate(user.id, selectedDate);
+        fetchFavoriteFoods(user.id);
       });
     }
 
@@ -71,7 +76,7 @@ function AppContent() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [user, selectedDate, setIsOffline, syncOfflineQueue, fetchGoals, fetchLogsForDate]);
+  }, [user, selectedDate, setIsOffline, syncOfflineQueue, fetchGoals, fetchLogsForDate, fetchFavoriteFoods]);
 
   // Capture PWA deferred prompt
   useEffect(() => {

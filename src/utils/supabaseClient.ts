@@ -13,3 +13,19 @@ export const supabase = createClient(
   supabaseUrl || 'https://placeholder-project.supabase.co',
   supabaseAnonKey || 'placeholder-key'
 );
+
+if (typeof window !== 'undefined') {
+  (window as any).supabase = supabase;
+}
+
+export const getValidatedUserId = async (): Promise<string> => {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session?.user?.id) {
+    const msg = "Sessione non trovata. Effettua nuovamente il Login per sincronizzare i dati.";
+    console.warn('[getValidatedUserId]', msg, error);
+    const err: any = new Error(msg);
+    err.code = 'UNAUTHENTICATED';
+    throw err;
+  }
+  return session.user.id;
+};

@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabaseClient';
+import { supabase, getValidatedUserId } from '../utils/supabaseClient';
 import type { DailyGoals, LoggedFood, MealType, FoodItem, Recipe, RecipeIngredient, SavedMeal, SavedMealItem } from '../types/diary';
 import { db } from '../utils/db';
 import { profileService } from './profileService';
@@ -309,6 +309,7 @@ export const diaryService = {
   ): Promise<LoggedFood | null> {
     try {
       if (!navigator.onLine || dailyLogId.startsWith('offline_')) throw new Error('Offline');
+      await getValidatedUserId();
       
       const payload: any = {
         daily_log_id: dailyLogId,
@@ -350,6 +351,7 @@ export const diaryService = {
       }
 
       if (error || !data) throw error;
+      console.log('[SUPABASE SYNC OK] food_entries:', data);
 
       const entry = data as SupabaseFoodEntry;
       const dateObj = new Date(entry.created_at);
@@ -428,12 +430,14 @@ export const diaryService = {
   async deleteFoodEntry(entryId: string): Promise<boolean> {
     try {
       if (!navigator.onLine || entryId.startsWith('offline_')) throw new Error('Offline');
+      await getValidatedUserId();
       const { error } = await supabase
         .from('food_entries')
         .delete()
         .eq('id', entryId);
 
       if (error) throw error;
+      console.log('[SUPABASE SYNC OK] food_entries (deleted):', entryId);
       return true;
     } catch (err) {
       console.warn('deleteFoodEntry falling back to IndexedDB:', err);
