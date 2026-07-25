@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { X, Trash2, Save, Tag } from 'lucide-react';
 import type { LoggedFood, MealType } from '../../types/diary';
 import { HealthScoreBadge } from '../common/HealthScoreBadge';
+import { MacroPreviewRings } from '../food/MacroPreviewRings';
+import { WheelDialPicker } from '../ui/WheelDialPicker';
+import { useDiaryStore } from '../../store/diaryStore';
 
 interface EditFoodLogModalProps {
   foodLog: LoggedFood;
@@ -131,9 +134,12 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
     }
   };
 
+  const { selectedDate, goals, getTotalsForDate } = useDiaryStore();
+  const dayTotals = useMemo(() => getTotalsForDate(selectedDate), [selectedDate, getTotalsForDate]);
+
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 pb-24 sm:pb-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[82vh] flex flex-col mb-4 sm:mb-0">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[85vh] flex flex-col mb-4 sm:mb-0">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3 shrink-0">
@@ -154,6 +160,22 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
         <div className="overflow-y-auto pr-1 flex-1 space-y-3 mb-4">
           {/* Health Score Badge (if present) */}
           <HealthScoreBadge score={foodLog.healthScore || 80} size="md" />
+
+          {/* Live Macro Remaining Preview Rings */}
+          <MacroPreviewRings
+            itemCalories={calculated.calories}
+            itemCarbs={calculated.carbs}
+            itemFat={calculated.fat}
+            itemProtein={calculated.protein}
+            goalCalories={goals.calories}
+            goalCarbs={goals.carbs}
+            goalFat={goals.fat}
+            goalProtein={goals.protein}
+            currentCalories={dayTotals.calories}
+            currentCarbs={dayTotals.macros.carbs}
+            currentFat={dayTotals.macros.fat}
+            currentProtein={dayTotals.macros.protein}
+          />
 
           {/* Food Name & Brand Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -249,80 +271,72 @@ export const EditFoodLogModal: React.FC<EditFoodLogModalProps> = ({
             </div>
           </div>
 
-          {/* Quantity Inputs */}
-          <div>
-            {portionMode === 'grams' ? (
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-slate-300">Peso in Grammi (g)</label>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    ≈ {(totalWeightInGrams / unitWeightGrams).toFixed(1)} porzioni
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  step="5"
-                  min="1"
-                  max="3000"
-                  inputMode="decimal"
-                  value={gramsInput}
-                  onChange={(e) => setGramsInput(Math.max(1, parseFloat(e.target.value) || 1))}
-                  className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                />
-                <div className="flex gap-1.5 justify-center mt-2">
-                  {[50, 100, 150, 200, 250].map((presetG) => (
-                    <button
-                      key={presetG}
-                      type="button"
-                      onClick={() => setGramsInput(presetG)}
-                      className={`py-1 px-2.5 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                        gramsInput === presetG
-                          ? 'bg-cyan-500 text-slate-950 shadow-md'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {presetG}g
-                    </button>
-                  ))}
-                </div>
+          {/* Interactive Wheel/Dial Picker Control */}
+          {portionMode === 'grams' ? (
+            <div className="space-y-2">
+              <WheelDialPicker
+                value={gramsInput}
+                onChange={(val) => setGramsInput(val)}
+                min={1}
+                max={3000}
+                unit="g"
+                label="Selettore Grammi (Ghiera)"
+                steps={[
+                  { label: '1g', value: 1 },
+                  { label: '5g', value: 5 },
+                  { label: '10g', value: 10 },
+                ]}
+              />
+              <div className="flex gap-1.5 justify-center">
+                {[50, 100, 150, 200, 250].map((presetG) => (
+                  <button
+                    key={presetG}
+                    type="button"
+                    onClick={() => setGramsInput(presetG)}
+                    className={`py-1 px-2.5 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                      gramsInput === presetG
+                        ? 'bg-cyan-500 text-slate-950 shadow-md'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {presetG}g
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-slate-300">Numero di Porzioni</label>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    1 porzione = {unitWeightGrams}g
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  step="0.25"
-                  min="0.1"
-                  max="50"
-                  inputMode="decimal"
-                  value={portionInput}
-                  onChange={(e) => setPortionInput(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                  className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
-                />
-                <div className="flex gap-1.5 justify-center mt-2">
-                  {[0.5, 1, 1.5, 2, 3].map((presetP) => (
-                    <button
-                      key={presetP}
-                      type="button"
-                      onClick={() => setPortionInput(presetP)}
-                      className={`py-1 px-2 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                        portionInput === presetP
-                          ? 'bg-cyan-500 text-slate-950 shadow-md'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {presetP} {presetP === 1 ? 'porz' : 'porzioni'}
-                    </button>
-                  ))}
-                </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <WheelDialPicker
+                value={portionInput}
+                onChange={(val) => setPortionInput(val)}
+                min={0.1}
+                max={50}
+                unit="porz"
+                label="Selettore Porzioni (Ghiera)"
+                steps={[
+                  { label: '0.1', value: 0.1 },
+                  { label: '0.5', value: 0.5 },
+                  { label: '1 porz', value: 1 },
+                ]}
+              />
+              <div className="flex gap-1.5 justify-center">
+                {[0.5, 1, 1.5, 2, 3].map((presetP) => (
+                  <button
+                    key={presetP}
+                    type="button"
+                    onClick={() => setPortionInput(presetP)}
+                    className={`py-1 px-2 rounded-xl text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                      portionInput === presetP
+                        ? 'bg-cyan-500 text-slate-950 shadow-md'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {presetP} {presetP === 1 ? 'porz' : 'porzioni'}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}

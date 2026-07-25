@@ -716,6 +716,77 @@ export const diaryService = {
   },
 
   /**
+   * Fetches custom portion overrides for a user
+   */
+  async fetchUserCustomPortions(userId: string): Promise<Record<string, number>> {
+    try {
+      if (!navigator.onLine) throw new Error('Offline');
+      const { data, error } = await supabase
+        .from('user_custom_portions')
+        .select('food_id, portion_weight_g')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      const portionsMap: Record<string, number> = {};
+      (data || []).forEach((row: any) => {
+        portionsMap[row.food_id] = Number(row.portion_weight_g);
+      });
+
+      // Cache locally in IndexedDB
+      for (const foodId of Object.keys(portionsMap)) {
+        await db.userPortions.put({
+          key: `${userId}_${foodId}`,
+          userId,
+          foodId,
+          portionWeightG: portionsMap[foodId],
+        });
+      }
+
+      return portionsMap;
+    } catch (err) {
+      console.warn('fetchUserCustomPortions falling back to IndexedDB:', err);
+      const cached = await db.userPortions.where('userId').equals(userId).toArray();
+      const map: Record<string, number> = {};
+      cached.forEach((c) => {
+        map[c.foodId] = c.portionWeightG;
+      });
+      return map;
+    }
+  },
+
+  /**
+   * Upserts a custom portion size override for a food item
+   */
+  async upsertUserCustomPortion(userId: string, foodId: string, portionWeightG: number): Promise<boolean> {
+    try {
+      if (navigator.onLine) {
+        const { error } = await supabase
+          .from('user_custom_portions')
+          .upsert(
+            { user_id: userId, food_id: foodId, portion_weight_g: portionWeightG },
+            { onConflict: 'user_id,food_id' }
+          );
+
+        if (error) console.warn('upsertUserCustomPortion Supabase warning:', error);
+      }
+
+      // Always update IndexedDB cache
+      await db.userPortions.put({
+        key: `${userId}_${foodId}`,
+        userId,
+        foodId,
+        portionWeightG,
+      });
+
+      return true;
+    } catch (err) {
+      console.warn('upsertUserCustomPortion error fallback:', err);
+      return true;
+    }
+  },
+
+  /**
    * Fetches daily summaries of calorie and macro intake for a range of dates
    */
   async fetchDailySummariesRange(

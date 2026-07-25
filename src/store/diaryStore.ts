@@ -17,6 +17,7 @@ interface DiaryStore {
   weightLogs: { date: string; weight: number }[];
   recipes: Recipe[];
   savedMeals: SavedMeal[];
+  userCustomPortions: Record<string, number>;
   isLoadingLogs: boolean;
   isLoadingGoals: boolean;
   isLoadingWeightLogs: boolean;
@@ -33,6 +34,8 @@ interface DiaryStore {
   fetchGoals: (userId: string) => Promise<void>;
   fetchLogsForDate: (userId: string, date: string) => Promise<void>;
   fetchExerciseCalories: (userId: string, date: string) => Promise<void>;
+  fetchUserCustomPortions: (userId: string) => Promise<void>;
+  setUserCustomPortion: (userId: string, foodId: string, portionWeightG: number) => Promise<void>;
   addFoodLog: (userId: string, date: string, food: FoodItem, mealType: MealType, servings?: number) => Promise<void>;
   updateFoodLog: (date: string, logId: string, mealType: MealType, foodName: string, calories: number, carbs: number, fat: number, protein: number, servings?: number, servingSizeDisplay?: string, brand?: string, healthScore?: number) => Promise<void>;
   removeFoodLog: (date: string, logId: string) => Promise<void>;
@@ -80,6 +83,7 @@ export const useDiaryStore = create<DiaryStore>()(
       weightLogs: [],
       recipes: [],
       savedMeals: [],
+      userCustomPortions: {},
       isLoadingLogs: false,
       isLoadingGoals: false,
       isLoadingWeightLogs: false,
@@ -556,6 +560,29 @@ export const useDiaryStore = create<DiaryStore>()(
           set({ isLoadingSavedMeals: false });
         }
         return null;
+      },
+
+      fetchUserCustomPortions: async (userId) => {
+        try {
+          const map = await diaryService.fetchUserCustomPortions(userId);
+          set({ userCustomPortions: map });
+        } catch (err) {
+          console.error('Error fetching user custom portions:', err);
+        }
+      },
+
+      setUserCustomPortion: async (userId, foodId, portionWeightG) => {
+        try {
+          set((state) => ({
+            userCustomPortions: {
+              ...state.userCustomPortions,
+              [foodId]: portionWeightG,
+            },
+          }));
+          await diaryService.upsertUserCustomPortion(userId, foodId, portionWeightG);
+        } catch (err) {
+          console.error('Error saving user custom portion:', err);
+        }
       },
 
       deleteSavedMeal: async (mealId) => {

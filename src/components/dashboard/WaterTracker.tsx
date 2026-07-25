@@ -1,6 +1,7 @@
 import React from 'react';
 import { Droplet, Plus, Minus } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
+import { WheelDialPicker } from '../ui/WheelDialPicker';
 
 interface WaterTrackerProps {
   consumedMl: number;
@@ -16,8 +17,8 @@ export const WaterTracker: React.FC<WaterTrackerProps> = ({
   const percentage = Math.min(100, Math.round((consumedMl / goalMl) * 100));
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-xl bg-cyan-950/80 border border-cyan-800/50 text-cyan-400">
             <Droplet className="w-5 h-5 fill-cyan-400/20" />
@@ -35,7 +36,7 @@ export const WaterTracker: React.FC<WaterTrackerProps> = ({
         </div>
       </div>
 
-      <div className="mb-3">
+      <div>
         <ProgressBar
           value={consumedMl}
           max={goalMl}
@@ -48,28 +49,52 @@ export const WaterTracker: React.FC<WaterTrackerProps> = ({
         </div>
       </div>
 
+      {/* Wheel Dial Picker for Water Intake */}
+      <WheelDialPicker
+        value={consumedMl}
+        onChange={(newTotal) => {
+          const delta = newTotal - consumedMl;
+          if (delta !== 0) {
+            onIncrement(delta);
+          }
+        }}
+        min={0}
+        max={10000}
+        unit="ml"
+        label="Selettore Acqua"
+        steps={[
+          { label: '50ml', value: 50 },
+          { label: '100ml', value: 100 },
+          { label: '250ml', value: 250 },
+        ]}
+      />
+
+      {/* Quick Incremental Buttons */}
       <div className="grid grid-cols-3 gap-2">
         <button
+          type="button"
           onClick={() => onIncrement(250)}
           className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-cyan-950 active:text-cyan-400 text-xs font-semibold text-slate-200 border border-slate-700/60 transition-all cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 text-cyan-400" />
-          250 ml
+          +250 ml
         </button>
         <button
+          type="button"
           onClick={() => onIncrement(500)}
           className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-cyan-950 active:text-cyan-400 text-xs font-semibold text-slate-200 border border-slate-700/60 transition-all cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 text-cyan-400" />
-          500 ml
+          +500 ml
         </button>
         <button
+          type="button"
           onClick={() => onIncrement(-250)}
           disabled={consumedMl <= 0}
           className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 text-xs font-medium text-slate-400 border border-slate-800 disabled:opacity-40 transition-all cursor-pointer"
         >
           <Minus className="w-3.5 h-3.5" />
-          250 ml
+          -250 ml
         </button>
       </div>
     </div>

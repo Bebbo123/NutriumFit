@@ -12,6 +12,7 @@ import {
   ChevronUp,
   Search,
   Tag,
+  Settings2,
 } from 'lucide-react';
 import { useDiaryStore } from '../store/diaryStore';
 import { MOCK_FOOD_DATABASE } from '../data/mockFoods';
@@ -25,6 +26,8 @@ import { searchAllFoods, fetchFoodByBarcode } from '../services/foodApiService';
 import { diaryService } from '../services/diaryService';
 import { Html5Qrcode } from 'html5-qrcode';
 import { HealthScoreBadge } from '../components/common/HealthScoreBadge';
+import { MacroPreviewRings } from '../components/food/MacroPreviewRings';
+import { WheelDialPicker } from '../components/ui/WheelDialPicker';
 
 interface AddFoodPageProps {
   initialMealType?: MealType;
@@ -40,6 +43,11 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
   const { user } = useAuth();
   const {
     selectedDate,
+    goals,
+    getTotalsForDate,
+    userCustomPortions,
+    fetchUserCustomPortions,
+    setUserCustomPortion,
     addFoodLog,
     fetchLogsForDate,
     logs,
@@ -272,15 +280,24 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
     }
   }, [searchQuery, activeTab, apiFoods, recentFoods, customFoods]);
 
+  useEffect(() => {
+    if (user) {
+      fetchUserCustomPortions(user.id);
+    }
+  }, [user, fetchUserCustomPortions]);
+
   const unitWeightGrams = useMemo(() => {
     if (!selectedFoodForServing) return 100;
+    if (userCustomPortions[selectedFoodForServing.id]) {
+      return userCustomPortions[selectedFoodForServing.id];
+    }
     if (selectedFoodForServing.servingAmount && selectedFoodForServing.servingAmount > 10) {
       return selectedFoodForServing.servingAmount;
     }
     const match = selectedFoodForServing.servingSize?.match(/(\d+)\s*g/i);
     if (match) return parseInt(match[1], 10);
     return 100;
-  }, [selectedFoodForServing]);
+  }, [selectedFoodForServing, userCustomPortions]);
 
   const totalWeightInGrams = useMemo(() => {
     if (portionMode === 'grams') return Math.max(1, servingsInput || 1);
@@ -305,15 +322,32 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
 
   const handleSelectFood = (food: FoodItem) => {
     setSelectedFoodForServing(food);
-    const uWeight = food.servingAmount > 10 ? food.servingAmount : 100;
-    if (food.id.startsWith('off_') || food.id.startsWith('custom_')) {
+    const customWeight = userCustomPortions[food.id];
+    const uWeight = customWeight || (food.servingAmount > 10 ? food.servingAmount : 100);
+    if (customWeight || !food.id.startsWith('off_')) {
+      setPortionMode('grams');
+      setServingsInput(uWeight);
+      setPortionCountInput(1);
+    } else {
       setPortionMode('grams');
       setServingsInput(100);
       setPortionCountInput(1);
-    } else {
-      setPortionMode('portions');
-      setPortionCountInput(1);
-      setServingsInput(uWeight);
+    }
+  };
+
+  const handleCustomizePortion = () => {
+    if (!selectedFoodForServing || !user) return;
+    const currentCustom = userCustomPortions[selectedFoodForServing.id] || unitWeightGrams;
+    const input = prompt(
+      `Personalizza il peso standard per 1 porzione di "${selectedFoodForServing.name}" in grammi:`,
+      currentCustom.toString()
+    );
+    if (input !== null) {
+      const val = parseFloat(input);
+      if (!isNaN(val) && val > 0) {
+        setUserCustomPortion(user.id, selectedFoodForServing.id, val);
+        showToast(`Porzione personalizzata a ${val}g con successo!`);
+      }
     }
   };
 
@@ -1187,97 +1221,113 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
         </div>
       )}
 
-      {/* Selected Food Servings adjustment modal popup with Dual Selector */}
-      {selectedFoodForServing && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 pb-24 sm:pb-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[82vh] flex flex-col mb-4 sm:mb-0">
-            {/* Scrollable Form Content */}
-            <div className="overflow-y-auto pr-1 flex-1 space-y-3 mb-3">
-              <div>
-                <h3 className="text-lg font-extrabold text-white mb-1">{selectedFoodForServing.name}</h3>
-                {selectedFoodForServing.brand && (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-cyan-400 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800 mb-2">
-                    <Tag className="w-3 h-3" /> {selectedFoodForServing.brand}
-                  </span>
-                )}
-              </div>
+      {/* Selected Food Servings adjustment modal popup with Dual Selector & Wheel Picker */}
+      {selectedFoodForServing && (() => {
+        const dayTotals = getTotalsForDate(selectedDate);
 
-              <HealthScoreBadge score={selectedFoodForServing.healthScore || 75} size="md" />
-
-              {/* Segmented Toggle Control */}
-              <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPortionMode('grams');
-                    setServingsInput(totalWeightInGrams);
-                  }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    portionMode === 'grams'
-                      ? 'bg-cyan-500 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Grammi (g)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPortionMode('portions');
-                    setPortionCountInput(Math.round((totalWeightInGrams / unitWeightGrams) * 10) / 10 || 1);
-                  }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    portionMode === 'portions'
-                      ? 'bg-cyan-500 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Porzioni
-                </button>
-              </div>
-
-              {/* Live Calculated Macros Badge */}
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 font-mono text-center">
-                <span className="text-2xl font-black text-cyan-400">
-                  {calculatedValues.calories}{' '}
-                  <span className="text-xs font-normal text-slate-400">kcal</span>
-                </span>
-                <div className="flex justify-center gap-4 text-xs mt-2 text-slate-300">
-                  <span className="text-blue-400 font-semibold">
-                    {calculatedValues.carbs}g C
-                  </span>
-                  <span className="text-red-400 font-semibold">
-                    {calculatedValues.fat}g F
-                  </span>
-                  <span className="text-emerald-400 font-semibold">
-                    {calculatedValues.protein}g P
-                  </span>
-                </div>
-              </div>
-
-              {/* Quantity Controls */}
-              <div className="space-y-3 mb-5">
-                {portionMode === 'grams' ? (
+        return (
+          <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 pb-24 sm:pb-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[85vh] flex flex-col mb-4 sm:mb-0">
+              {/* Scrollable Form Content */}
+              <div className="overflow-y-auto pr-1 flex-1 space-y-3 mb-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-bold text-slate-300">
-                        Peso in Grammi (g)
-                      </label>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        ≈ {(totalWeightInGrams / unitWeightGrams).toFixed(1)} porzioni
+                    <h3 className="text-base font-extrabold text-white mb-0.5">{selectedFoodForServing.name}</h3>
+                    {selectedFoodForServing.brand && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-400 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+                        <Tag className="w-3 h-3" /> {selectedFoodForServing.brand}
                       </span>
-                    </div>
-                    <input
-                      type="number"
-                      step="5"
-                      min="1"
-                      max="3000"
-                      inputMode="decimal"
+                    )}
+                  </div>
+                  <HealthScoreBadge score={selectedFoodForServing.healthScore || 75} size="sm" showBar={false} />
+                </div>
+
+                {/* Live Macro Remaining Preview Rings */}
+                <MacroPreviewRings
+                  itemCalories={calculatedValues.calories}
+                  itemCarbs={calculatedValues.carbs}
+                  itemFat={calculatedValues.fat}
+                  itemProtein={calculatedValues.protein}
+                  goalCalories={goals.calories}
+                  goalCarbs={goals.carbs}
+                  goalFat={goals.fat}
+                  goalProtein={goals.protein}
+                  currentCalories={dayTotals.calories}
+                  currentCarbs={dayTotals.macros.carbs}
+                  currentFat={dayTotals.macros.fat}
+                  currentProtein={dayTotals.macros.protein}
+                />
+
+                {/* Segmented Toggle Control */}
+                <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPortionMode('grams');
+                      setServingsInput(totalWeightInGrams);
+                    }}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      portionMode === 'grams'
+                        ? 'bg-cyan-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Grammi (g)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPortionMode('portions');
+                      setPortionCountInput(Math.round((totalWeightInGrams / unitWeightGrams) * 10) / 10 || 1);
+                    }}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      portionMode === 'portions'
+                        ? 'bg-cyan-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Porzioni
+                  </button>
+                </div>
+
+                {/* Live Calculated Macros Badge & Custom Portion Override Button */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 font-mono text-center space-y-1.5">
+                  <span className="text-2xl font-black text-cyan-400">
+                    {calculatedValues.calories}{' '}
+                    <span className="text-xs font-normal text-slate-400">kcal</span>
+                  </span>
+                  <div className="flex justify-center gap-4 text-xs text-slate-300">
+                    <span className="text-blue-400 font-semibold">{calculatedValues.carbs}g C</span>
+                    <span className="text-red-400 font-semibold">{calculatedValues.fat}g F</span>
+                    <span className="text-emerald-400 font-semibold">{calculatedValues.protein}g P</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCustomizePortion}
+                    className="mt-1 pt-1.5 border-t border-slate-800/80 text-[11px] font-sans font-bold text-cyan-400 hover:text-cyan-300 flex items-center justify-center gap-1.5 w-full cursor-pointer"
+                  >
+                    <Settings2 className="w-3.5 h-3.5" />
+                    Personalizza Porzione Standard ({unitWeightGrams}g)
+                  </button>
+                </div>
+
+                {/* Interactive Wheel/Dial Picker Control & Presets */}
+                {portionMode === 'grams' ? (
+                  <div className="space-y-2">
+                    <WheelDialPicker
                       value={servingsInput}
-                      onChange={(e) => setServingsInput(Math.max(1, parseFloat(e.target.value) || 1))}
-                      className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                      onChange={(val) => setServingsInput(val)}
+                      min={1}
+                      max={3000}
+                      unit="g"
+                      label="Selettore Grammi (Ghiera)"
+                      steps={[
+                        { label: '1g', value: 1 },
+                        { label: '5g', value: 5 },
+                        { label: '10g', value: 10 },
+                      ]}
                     />
-                    <div className="flex gap-1.5 justify-center mt-2">
+                    <div className="flex gap-1.5 justify-center">
                       {[50, 100, 150, 200, 250].map((presetG) => (
                         <button
                           key={presetG}
@@ -1295,26 +1345,21 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-bold text-slate-300">
-                        Numero di Porzioni
-                      </label>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        1 porzione = {unitWeightGrams}g
-                      </span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.25"
-                      min="0.1"
-                      max="50"
-                      inputMode="decimal"
+                  <div className="space-y-2">
+                    <WheelDialPicker
                       value={portionCountInput}
-                      onChange={(e) => setPortionCountInput(Math.max(0.1, parseFloat(e.target.value) || 1))}
-                      className="w-full text-center py-2.5 text-xl font-black font-mono bg-slate-950 border border-slate-800 rounded-2xl text-cyan-400 focus:outline-none focus:border-cyan-500"
+                      onChange={(val) => setPortionCountInput(val)}
+                      min={0.1}
+                      max={50}
+                      unit="porz"
+                      label="Selettore Porzioni (Ghiera)"
+                      steps={[
+                        { label: '0.1', value: 0.1 },
+                        { label: '0.5', value: 0.5 },
+                        { label: '1 porz', value: 1 },
+                      ]}
                     />
-                    <div className="flex gap-1.5 justify-center mt-2">
+                    <div className="flex gap-1.5 justify-center">
                       {[0.5, 1, 1.5, 2, 3].map((presetP) => (
                         <button
                           key={presetP}
@@ -1333,28 +1378,28 @@ export const AddFoodPage: React.FC<AddFoodPageProps> = ({
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Fixed Action Buttons at bottom of card */}
-            <div className="flex gap-2 pt-2 border-t border-slate-800/60 shrink-0">
-              <button
-                type="button"
-                onClick={() => setSelectedFoodForServing(null)}
-                className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmServingAdd}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
-              >
-                Aggiungi a {selectedMeal}
-              </button>
+              {/* Fixed Action Buttons at bottom of card */}
+              <div className="flex gap-2 pt-2 border-t border-slate-800/60 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFoodForServing(null)}
+                  className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold text-sm cursor-pointer"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmServingAdd}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 cursor-pointer"
+                >
+                  Aggiungi a {selectedMeal}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Selected Recipe Servings selection modal popup */}
       {selectedRecipeForDiary && (
